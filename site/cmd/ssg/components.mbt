@@ -124,7 +124,7 @@ fn site_header(prefix : String, show_back : Bool) -> @html.Html {
   let nav = [
     link(prefix + "#docs", "", "文档"),
     link(prefix + "#setup", "", "安装"),
-    link(prefix + "#try", "", "试用"),
+    link(prefix + "#try", "site-nav-cta", "试用"),
     link(prefix + "benchmark/", "", "性能"),
     link("https://github.com/conglinyizhi/precss", "", "GitHub"),
   ]
@@ -221,7 +221,7 @@ fn benchmark_page() -> @rabbita.Val[@html.Html] {
 
 fn performance_group(label : String, baseline : String) -> @html.Html {
   data_el("div", "performance-group", "syntax", label.to_lower(), [
-    el("div", "performance-group-title", [txt("# " + label.to_lower())]),
+    el("div", "performance-group-title", [txt(label.to_lower())]),
     data_el("span", "performance-name performance-name-precss", "role", "precss", [
       txt("PreCSS"),
       el("span", "performance-time", [txt(" · -- ms")]),
@@ -248,9 +248,14 @@ fn home_page() -> @rabbita.Val[@html.Html] {
           el("section", "home-intro", [
             el("div", "home-hero-column", [
               site_card("home-hero", [
-                el("p", "home-eyebrow", [txt("MOONBIT · CSS PREPROCESSOR")]),
+                el("p", "home-eyebrow", [txt("WASM-FIRST · SCSS / SASS / LESS")]),
                 page_heading("PreCSS", "MoonBit 实现的 CSS 预处理引擎"),
-                link("#docs", "site-cta", "快速开始"),
+                el("div", "home-flow", [
+                  el("span", "home-flow-source", [txt("SCSS / SASS / LESS")]),
+                  el("span", "home-flow-arrow", [txt("→")]),
+                  el("span", "home-flow-output", [txt("CSS")]),
+                ]),
+                link("#try", "site-cta", "打开 Playground"),
               ]),
             ]),
             el("aside", "site-card performance-teaser performance-teaser-loading", [
@@ -262,7 +267,7 @@ fn home_page() -> @rabbita.Val[@html.Html] {
               link("benchmark/", "performance-teaser-link", "查看完整基准"),
             ]),
           ]),
-          el("p", "site-note home-note", [txt("左边编辑器用 CodeMirror 实现着色；右侧不是")]),
+          el("p", "site-note home-note", [txt("写一段 SCSS、SASS 或 LESS，右侧即时生成 CSS。")]),
           editor(),
         ]),
       [

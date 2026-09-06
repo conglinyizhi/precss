@@ -11,9 +11,9 @@ $cta-text: #ffffff;
 $note: #6a6570;
 
 .site-card {
-  background: linear-gradient(145deg, #342b50 0%, $code-head 72%);
+  background: $code-head;
   border: 1px solid #4a3d68;
-  border-radius: 0.55rem;
+  border-radius: 0.4rem;
   box-shadow: 0 1rem 2.5rem rgba(0, 0, 0, 0.18);
 }
 
@@ -46,10 +46,20 @@ $note: #6a6570;
 }
 .site-nav a { color: $text; }
 .site-nav a:hover { color: #fff; }
+.site-nav-cta {
+  padding: 0.35rem 0.65rem;
+  border: 1px solid #6d4cc2;
+  border-radius: 0.3rem;
+  color: #e9ddff !important;
+}
+.site-nav-cta:hover {
+  border-color: #a78bfa;
+  background: rgba(124, 58, 237, 0.18);
+}
 
 .home-intro {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: minmax(0, 1.15fr) minmax(20rem, 0.85fr);
   align-items: stretch;
   gap: 2rem;
   width: min(100% - 2rem, 1200px);
@@ -64,7 +74,8 @@ $note: #6a6570;
     position: relative;
     flex: 1;
     overflow: hidden;
-    padding: 2.35rem 2rem 2rem;
+    padding: 3rem 3rem 2.7rem;
+    background: #342b50;
     text-align: left;
 
     &::before {
@@ -87,14 +98,41 @@ $note: #6a6570;
 
     .site-title {
       margin-top: 0;
+      margin-bottom: 0.8rem;
+      font-size: clamp(3rem, 7vw, 5.4rem);
+      letter-spacing: -0.04em;
       text-align: left;
     }
-    .site-sub { text-align: left; }
-    .site-cta { margin: 1.8rem 0 0; }
+    .site-sub {
+      max-width: 30rem;
+      text-align: left;
+    }
+    .home-flow {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      margin-top: 1.8rem;
+      color: $text;
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      font-size: 0.78rem;
+      letter-spacing: 0.02em;
+    }
+    .home-flow-source { color: #d8b4fe; }
+    .home-flow-arrow { color: #8b5cf6; font-size: 1.15rem; }
+    .home-flow-output { color: #a5f3a5; }
+    .site-cta {
+      margin: 2.1rem 0 0;
+      border-radius: 0.35rem;
+    }
   }
 
   .performance-teaser {
-    padding: 1.4rem 1.35rem 1.25rem;
+    display: flex;
+    flex-direction: column;
+    padding: 1.6rem 1.5rem 1.35rem;
+    background: transparent;
+    border-top: 2px solid #8b5cf6;
+    box-shadow: none;
 
     h2 {
       margin: 0;
@@ -115,12 +153,16 @@ $note: #6a6570;
       column-gap: 0.7rem;
       row-gap: 0.22rem;
       align-items: center;
-      margin: 0.85rem 0;
+      flex: 1;
+      align-content: center;
+      margin: 0;
+      padding: 0.8rem 0;
+      border-top: 1px solid rgba(61, 53, 90, 0.85);
 
       .performance-group-title {
         grid-column: 1 / -1;
         color: #c084fc;
-        font-size: 0.72rem;
+        font-size: 0.9rem;
         font-weight: 700;
         line-height: 1.35;
       }
@@ -172,7 +214,8 @@ $note: #6a6570;
     }
     .performance-teaser-link {
       display: inline-block;
-      margin-top: 0.35rem;
+      padding-top: 0.4rem;
+      margin-top: auto;
       color: $title;
       font-size: 0.78rem;
       text-decoration: none;
@@ -213,7 +256,7 @@ $note: #6a6570;
   background: $cta-bg;
   color: $cta-text;
   padding: 0.7rem 1.4rem;
-  border-radius: 9999px;
+  border-radius: 0.35rem;
   font-weight: 700;
   text-decoration: none;
 }
@@ -408,7 +451,11 @@ $note: #6a6570;
 
 /* CTA 下方的灰色小字（玩梗，不显眼但看得清） */
 .site-note { font-size: 0.8rem; color: $note; text-align: center; margin: 0.65rem auto 0.2rem; }
-.home-note { width: min(100% - 2rem, 1200px); }
+.home-note {
+  width: min(100% - 2rem, 1200px);
+  margin-top: 1.25rem;
+  margin-bottom: 0.5rem;
+}
 .site-note code { color: #8b8494; }
 
 /* 输入侧 overlay：textarea 透明文字 + mirror 高亮，滚动同步 */
@@ -536,29 +583,49 @@ $note: #6a6570;
 .lang-group { display: flex; gap: 0.5rem; align-items: center; }
 
 @media (max-width: 700px) {
+  .site-header-inner {
+    align-items: flex-start;
+    flex-wrap: wrap;
+    gap: 0.7rem;
+    padding: 0.7rem 0;
+  }
+  .site-nav {
+    width: 100%;
+    gap: 0.9rem;
+    overflow-x: auto;
+    padding-bottom: 0.15rem;
+  }
+  .site-nav a { white-space: nowrap; }
   .home-intro {
     grid-template-columns: 1fr;
     gap: 1rem;
     margin-top: 2rem;
   }
-  .home-hero { padding: 1.6rem 1.25rem 1.45rem; }
+  .home-hero { padding: 2rem 1.25rem 1.8rem; }
+  .home-flow { flex-wrap: wrap; }
   .site-editor { grid-template-columns: 1fr; }
   .engine-control { top: 0; }
   .vars-bar-top { width: 100%; flex-wrap: wrap; }
 }
 
 .benchmark-page {
-  .site-header-inner { width: min(100% - 2rem, 960px); }
+  .site-header-inner { width: min(100% - 2rem, 1200px); }
   .benchmark-back { color: $sub; text-decoration: none; font-size: 0.9rem; }
   .benchmark-back:hover { color: #fff; }
-  .benchmark-main { width: min(100% - 2rem, 960px); margin: 0 auto 4rem; }
-  .benchmark-heading .site-title { margin-top: 3.2rem; margin-bottom: 0.4rem; }
-  .benchmark-heading .site-sub { margin-bottom: 2rem; }
+  .benchmark-main { width: min(100% - 2rem, 1200px); margin: 0 auto 4rem; }
+  .benchmark-heading {
+    padding: 3.4rem 0 1.8rem;
+    border-bottom: 1px solid $code-border;
+  }
+  .benchmark-heading .site-title { margin: 0 0 0.4rem; text-align: left; font-size: clamp(2.4rem, 5vw, 4rem); letter-spacing: -0.03em; }
+  .benchmark-heading .site-sub { max-width: 42rem; margin: 0; text-align: left; }
   .benchmark-card {
-    margin: 1.2rem 0;
-    padding: 1.35rem;
+    margin: 1.5rem 0;
+    padding: 1.5rem;
     overflow-x: auto;
   }
+  .benchmark-heading + .benchmark-card { margin-top: 1.8rem; }
+  .benchmark-card:last-child { margin-bottom: 0; }
   .benchmark-card h2 { margin: 0 0 0.9rem; color: $sub; font-size: 1.05rem; }
   .benchmark-card p { margin: 0.65rem 0; line-height: 1.7; }
   .benchmark-summary { color: $sub; }
@@ -583,7 +650,9 @@ $note: #6a6570;
 
 @media (max-width: 700px) {
   .benchmark-page {
-    .benchmark-main { width: min(100% - 1rem, 960px); }
+    .benchmark-main { width: min(100% - 1rem, 1200px); }
+    .benchmark-heading { padding: 2.4rem 0 1.3rem; }
+    .benchmark-heading .site-title { font-size: 2.4rem; }
     .benchmark-card { padding: 1rem; }
     .benchmark-meta { grid-template-columns: 1fr; gap: 0.15rem; }
     .benchmark-meta dd { margin-bottom: 0.45rem; }
