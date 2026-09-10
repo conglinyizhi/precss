@@ -8,7 +8,7 @@
 /// 期望值全部与 less.js 的实际渲染核对过：语义一致，空白按 precss 自己的排版。
 /// 其中「无参 mixin」那几条在补测试之前是坏的——`.m { }` 只被当成普通类规则，
 /// 没注册成可调用的 mixin，于是 `.a { .m; }` 会把整个 `.a` 块丢掉。
-fn compile_less(src : String) -> String {
+fn compile_less(src : String) -> String raise @core.CompileError {
   @less.eval_less(@less.parse_less(@scss.tokenize(src)), None)
 }
 
@@ -260,6 +260,39 @@ test "child combinator" {
     compile_less(".a > .b { color: red; }"),
     content=(
       #|.a > .b {
+      #|  color: red;
+      #|}
+      #|
+      #|
+    ),
+  )
+}
+
+///|
+/// 未定义的 mixin 要报错，不能静默把调用方的内容吞掉。
+/// less.js 对 `.a { .nope; }` 报 ".nope is undefined"。
+test "undefined mixin is reported" {
+  let result = Ok(compile_less(".a { .nope; }")) catch { err => Err(err) }
+  match result {
+    Err(@core.CompileError::EngineFailed(engine~, message~)) => {
+      assert_eq(engine, "less")
+      assert_true(message.contains(".nope is undefined"))
+    }
+    _ => fail("expected an EngineFailed error")
+  }
+}
+
+///|
+/// 已定义的 mixin 不应被误报。
+test "defined mixin does not raise" {
+  inspect(
+    compile_less(".m { color: red; } .a { .m; }"),
+    content=(
+      #|.m {
+      #|  color: red;
+      #|}
+      #|
+      #|.a {
       #|  color: red;
       #|}
       #|

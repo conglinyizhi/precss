@@ -15,7 +15,7 @@ priv struct Env {
 pub fn eval_less(
   nodes : Array[LessNode],
   read : ((String) -> String raise @core.CompileError)?,
-) -> String {
+) -> String raise @core.CompileError {
   let env = new_scope(nodes, None)
   let sb = StringBuilder()
   ignore(gen_block(nodes, "", env, read, sb))
@@ -105,7 +105,7 @@ fn gen_block(
   env : Env,
   read : ((String) -> String raise @core.CompileError)?,
   sb : StringBuilder,
-) -> Bool {
+) -> Bool raise @core.CompileError {
   let mut wrote = false
   for node in nodes {
     if gen_node(node, parent, env, read, sb) {
@@ -124,7 +124,7 @@ fn gen_node(
   env : Env,
   read : ((String) -> String raise @core.CompileError)?,
   sb : StringBuilder,
-) -> Bool {
+) -> Bool raise @core.CompileError {
   match node {
     VarDef(_, _) | MixinDef(_, _, _) | MixinCall(_, _) => false
     Decl(prop, val) => {
@@ -156,7 +156,7 @@ fn gen_rule(
   env : Env,
   read : ((String) -> String raise @core.CompileError)?,
   sb : StringBuilder,
-) -> Bool {
+) -> Bool raise @core.CompileError {
   let child_env = new_scope(body, Some(env))
   let decls = gen_block_decls(body, child_env)
   if decls.length() > 0 {
@@ -179,7 +179,7 @@ fn gen_rule(
 fn gen_block_decls(
   nodes : Array[LessNode],
   env : Env,
-) -> Array[(String, String)] {
+) -> Array[(String, String)] raise @core.CompileError {
   let out : Array[(String, String)] = []
   collect_decls(nodes, env, out)
   // 保留最后一次出现：从后往前收集，再逆序输出
@@ -209,7 +209,7 @@ fn collect_decls(
   nodes : Array[LessNode],
   env : Env,
   out : Array[(String, String)],
-) -> Unit {
+) -> Unit raise @core.CompileError {
   for node in nodes {
     match node {
       Decl(prop, val) => out.push((prop, eval_value(val, env)))
@@ -217,7 +217,11 @@ fn collect_decls(
         match lookup_mixin(env, name) {
           Some((params, body)) =>
             collect_decls(body, bind_params(env, params, args), out)
-          None => ()
+          None =>
+            raise @core.CompileError::EngineFailed(
+              engine="less",
+              message=".\{name} is undefined",
+            )
         }
       _ => ()
     }
@@ -232,7 +236,7 @@ fn gen_block_lifted(
   env : Env,
   read : ((String) -> String raise @core.CompileError)?,
   sb : StringBuilder,
-) -> Bool {
+) -> Bool raise @core.CompileError {
   let mut wrote = false
   for node in nodes {
     match node {
@@ -248,7 +252,11 @@ fn gen_block_lifted(
               wrote = true
             }
           }
-          None => ()
+          None =>
+            raise @core.CompileError::EngineFailed(
+              engine="less",
+              message=".\{name} is undefined",
+            )
         }
       AtRule(name, prelude, body) =>
         if gen_at_rule(name, prelude, body, full, env, read, sb) {
@@ -271,7 +279,7 @@ fn gen_at_rule(
   env : Env,
   read : ((String) -> String raise @core.CompileError)?,
   sb : StringBuilder,
-) -> Bool {
+) -> Bool raise @core.CompileError {
   let pre = eval_value(prelude, env)
   let child_env = new_scope(body, Some(env))
   sb.write_string("@")
@@ -292,7 +300,7 @@ fn gen_import(
   env : Env,
   read : ((String) -> String raise @core.CompileError)?,
   sb : StringBuilder,
-) -> Bool {
+) -> Bool raise @core.CompileError {
   match read {
     None => false
     Some(f) => {
