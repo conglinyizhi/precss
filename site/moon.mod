@@ -14,7 +14,7 @@ description = "precss 演示站（rabbita SSG + 自研 tailwind-like）"
 
 import {
   "moonbitlang/async@0.21.2",
-  "moonbit-community/rabbita@0.15.4",
+  "moonbit-community/rabbita@0.15.7",
   "hackwaly/moonback@0.8.1",
   "conglinyizhi/precss@0.1.0",
 }
