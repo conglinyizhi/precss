@@ -220,7 +220,12 @@ fn LessParser::make_decl_or_raw(
     let val = head[colon + 1:].to_owned()
     Decl(prop, val)
   } else {
-    Raw(head.join(" "))
+    // 块内单独一个类名、又没有分号结尾（`.a { .m }`）：LESS 里这是无参
+    // mixin 调用。之前落成 Raw，而求值侧对 Raw 直接丢弃，整个块就没了。
+    match single_class_name(head) {
+      Some(name) => MixinCall(name, [])
+      None => Raw(head.join(" "))
+    }
   }
 }
 

@@ -33,10 +33,42 @@ fn new_scope(nodes : Array[LessNode], parent : Env?) -> Env {
         // 同名后定义覆盖（LESS 最后定义优先）
         vars[name] = val
       MixinDef(name, params, body) => mixins[name] = (params, body)
+      // 无括号的 `.name { }` 在 LESS 里同时是两样东西：一个普通类规则
+      // （要输出），和一个可调用的无参 mixin（`.name;` / `.name();`）。
+      // 之前只做了前者，于是调用会被 lookup_mixin 落空而静默丢弃。
+      // 这里补上注册；发射路径不受影响，`.name { }` 本身照旧输出。
+      RuleSet(sel, body) =>
+        match single_class_name(sel) {
+          Some(name) => mixins[name] = ([], body)
+          None => ()
+        }
       _ => ()
     }
   }
   { vars, mixins, parent, }
+}
+
+///|
+/// 选择器若恰好是单个类名（`.name`，且 name 全是标识符字符），返回不带点的名字。
+///
+/// 只认这种形式：`.a .b`、`.a:hover`、`.a, .b` 都不是单个类名，不能当 mixin 注册。
+fn single_class_name(sel : Array[String]) -> String? {
+  match sel {
+    [one] => {
+      if one.length() < 2 || one[0] != '.' {
+        return None
+      }
+      let mut i = 1
+      while i < one.length() {
+        if !is_ident_char(one[i]) {
+          return None
+        }
+        i = i + 1
+      }
+      Some(one[1:].to_owned())
+    }
+    _ => None
+  }
 }
 
 ///|
@@ -275,17 +307,38 @@ fn gen_import(
 ///|
 /// 组合父选择器与子选择器（token-aware：`&` 替换，`&:`/`&.` 等组合符不加空格）
 fn combine_selector(parent : String, sel : Array[String]) -> String {
+  let joined = join_selector_tokens(sel)
   if parent.length() == 0 {
-    return sel.join(" ")
+    return joined
   }
-  let s = sel.join(" ")
-  if s.contains("&") {
-    let mut r = s.replace(old="&", new=parent)
-    r = r.replace(old=" :", new=":")
-    r = r.replace(old=" ", new="")
-    return r
+  if joined.contains("&") {
+    return joined.replace(old="&", new=parent)
   }
-  parent + " " + s
+  parent + " " + joined
+}
+
+///|
+/// 选择器 token 拼装。
+///
+/// 直接 `" "` 拼会把 `.a:hover` 变成 `.a : hover`、`.a, .b` 变成 `.a , .b`。
+/// 规则：`:` 两侧都不留空格，`,` 前不留、后要留；其余（含 `>` `+` `~`
+/// 这类组合器）保留空格。
+fn join_selector_tokens(sel : Array[String]) -> String {
+  let buf = StringBuilder()
+  for i = 0; i < sel.length(); i = i + 1 {
+    if i > 0 {
+      let prev = sel[i - 1]
+      let tok = sel[i]
+      let tight = tok.has_prefix(":") ||
+        tok.has_prefix(",") ||
+        prev.has_suffix(":")
+      if !tight {
+        buf.write_char(' ')
+      }
+    }
+    buf.write_string(sel[i])
+  }
+  buf.to_string()
 }
 
 ///|
