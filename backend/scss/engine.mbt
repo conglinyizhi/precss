@@ -10,7 +10,8 @@
 /// 无法识别的边界（如 sass 简写属性 `:prop`、`//` 注释、`=` 混入）暂不处理，
 /// 转换产物若不被 scss 解析则走正常报错路径。
 
-///| 判断源码是否为 sass 缩进语法（无花括号 + 有缩进行）
+///|
+/// 判断源码是否为 sass 缩进语法（无花括号 + 有缩进行）
 pub fn is_sass_indent(source : String) -> Bool {
   let mut line_start = true
   for c in source {
@@ -25,7 +26,8 @@ pub fn is_sass_indent(source : String) -> Bool {
   false
 }
 
-///| 把 sass 缩进语法转成 scss
+///|
+/// 把 sass 缩进语法转成 scss
 pub fn sass_to_scss(source : String) -> String {
   let rows : Array[(Int, String)] = []
   for line in source.split("\n") {
@@ -42,7 +44,8 @@ pub fn sass_to_scss(source : String) -> String {
   out
 }
 
-///| 数前导空白（tab 近似算 2 个空格）
+///|
+/// 数前导空白（tab 近似算 2 个空格）
 fn count_indent(line : String) -> Int {
   let mut c = 0
   for ch in line {
@@ -57,8 +60,13 @@ fn count_indent(line : String) -> Int {
   c
 }
 
-///| 递归解析缩进块：返回 (scss 文本, 下一行下标)
-fn parse_sass(rows : Array[(Int, String)], i : Int, indent : Int) -> (String, Int) {
+///|
+/// 递归解析缩进块：返回 (scss 文本, 下一行下标)
+fn parse_sass(
+  rows : Array[(Int, String)],
+  i : Int,
+  indent : Int,
+) -> (String, Int) {
   let sb = StringBuilder()
   let mut j = i
   while j < rows.length() && rows[j].0 == indent {
@@ -81,20 +89,21 @@ fn parse_sass(rows : Array[(Int, String)], i : Int, indent : Int) -> (String, In
 
 ///|
 
-///| SCSS 后端引擎
+///|
+/// SCSS 后端引擎
 ///
 /// 把源码经 tokenize → parse → to_css 编译成 CSS，
 /// 交给门面 `Compiler` 路由使用。
 pub fn scss_engine() -> @core.Engine {
   @core.Engine::new(
-    name = () => "scss",
-    supports = (fmt) => fmt is @core.Scss,
-    compile = (source) => {
+    name=() => "scss",
+    supports=fmt => fmt is @core.Scss,
+    compile=source => {
       if is_sass_indent(source) {
         return to_css(parse_sheet(tokenize(sass_to_scss(source))))
       }
       to_css(parse_sheet(tokenize(source)))
     },
-    compile_imports = (source, read) => compile_with_imports(source, read),
+    compile_imports=(source, read) => compile_with_imports(source, read),
   )
 }

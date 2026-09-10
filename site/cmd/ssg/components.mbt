@@ -120,11 +120,21 @@ fn site_card(class_ : String, children : Array[@html.Html]) -> @html.Html {
   el("section", "site-card " + class_, children)
 }
 
-fn site_header(prefix : String, show_back : Bool) -> @html.Html {
+fn site_header(prefix : String, show_back : Bool, getting_started : Bool) -> @html.Html {
+  let docs_href = if getting_started {
+    "#docs"
+  } else {
+    prefix + "getting-started/#docs"
+  }
+  let setup_href = if getting_started {
+    "#setup"
+  } else {
+    prefix + "getting-started/#setup"
+  }
   let nav = [
-    link(prefix + "#docs", "", "文档"),
-    link(prefix + "#setup", "", "安装"),
-    link(prefix + "#try", "site-nav-cta", "试用"),
+    link(docs_href, "", "文档"),
+    link(setup_href, "", "安装"),
+    link(prefix + "#try", if getting_started { "" } else { "site-nav-cta" }, "试用"),
     link(prefix + "benchmark/", "", "性能"),
     link("https://github.com/conglinyizhi/precss", "", "GitHub"),
   ]
@@ -133,21 +143,22 @@ fn site_header(prefix : String, show_back : Bool) -> @html.Html {
   } else {
     []
   }
-  let actions = if show_back {
-    back
-  } else {
-    [el("nav", "site-nav", nav)]
-  }
+  let actions = [el("nav", "site-nav", nav + back)]
   el("header", "site-header", [
     el("div", "site-header-inner", [link(prefix + "#", "site-logo", "PreCSS")] + actions),
   ])
 }
 
-fn site_footer(prefix : String) -> @html.Html {
+fn site_footer(prefix : String, getting_started : Bool) -> @html.Html {
+  let docs_href = if getting_started {
+    "#docs"
+  } else {
+    prefix + "getting-started/#docs"
+  }
   el("footer", "site-footer", [
     plain("p", [
       txt("想了解更多？看看我们的 "),
-      link(prefix + "#docs", "", "入门指南"),
+      link(docs_href, "", "入门指南"),
       txt("，也可以查看 "),
       link(prefix + "benchmark/", "", "性能基准"),
       txt(" 或背后的人和想法"),
@@ -161,12 +172,13 @@ fn site_shell(
   body_class : String,
   prefix : String,
   show_back : Bool,
+  getting_started : Bool,
   content : @html.Html,
   scripts : Array[@html.Html],
 ) -> @html.Html {
   @html.html([
     site_head(title_, stylesheets),
-    el("body", body_class, [site_header(prefix, show_back), content, site_footer(prefix)] + scripts),
+    el("body", body_class, [site_header(prefix, show_back, getting_started), content, site_footer(prefix, getting_started)] + scripts),
   ])
 }
 
@@ -187,6 +199,7 @@ fn benchmark_page() -> @rabbita.Val[@html.Html] {
       "site-dark benchmark-page",
       "../",
       true,
+      false,
       el("main", "benchmark-main", [
           el("div", "benchmark-heading", [
             page_heading("性能比较", "用可复现的数据，看看 PreCSS 在共同支持语法子集上的表现"),
@@ -235,6 +248,37 @@ fn performance_group(label : String, baseline : String) -> @html.Html {
   ])
 }
 
+fn developer_start() -> @html.Html {
+  el_id("section", "docs", "developer-start", [
+    el("div", "developer-start-heading", [
+      el("p", "developer-kicker", [txt("MOONBIT · DEVELOPER QUICKSTART")]),
+      plain("h2", [txt("在 MoonBit 项目里使用 PreCSS")]),
+      plain("p", [txt("PreCSS 是库，不是框架：它只负责把 SCSS、SASS、LESS 或 CSS 源码编译成 CSS。")]),
+    ]),
+    el_id("div", "setup", "developer-start-grid", [
+      site_card("developer-card", [
+        plain("h3", [txt("安装")]),
+        plain("p", [txt("在项目目录添加 Mooncakes 依赖：")]),
+        plain("pre", [txt("moon add conglinyizhi/precss")]),
+        plain("p", [txt("核心公开 API 的包别名是 "), plain("code", [txt("@precss")]), txt("。")]),
+      ]),
+      site_card("developer-card", [
+        plain("h3", [txt("编译一段样式")]),
+        plain("p", [txt("显式选择 SCSS 入口，得到 CSS 字符串：")]),
+        plain("pre", [txt("let css = @precss.compile_scss(\".card { color: #7c3aed; }\")")]),
+        plain("p", [txt("构建脚本或服务端可以保存这个字符串，交给页面或静态资源使用。")]),
+      ]),
+    ]),
+    site_card("developer-card developer-rabbita", [
+      plain("h3", [txt("Rabbita（可选集成）")]),
+      plain("p", [txt("PreCSS 是库：它不规定页面如何组织。Rabbita 是可选的 UI / SSR 集成环境；使用 Rabbita 时，可以在构建期或服务端调用 @precss.compile_scss 生成 CSS，再注入 `<style>` 标签或写入静态资源。")]),
+      plain("pre", [txt("let css = @precss.compile_scss(\".card { color: #7c3aed; }\")\n\nfn page_component(css : String) -> @rabbita.Val[@html.Html] {\n  let (state, _emit) = @rabbita.create_pure_state(\n    css,\n    update=fn(model, _msg) { model },\n  )\n  state.view(css => @html.html([\n    @html.node(\"head\", @html.Attrs::build(), [\n      @html.node(\"style\", @html.Attrs::build(), [@html.text(css)]),\n    ]),\n    @html.node(\"body\", @html.Attrs::build(), []),\n  ]))\n}\n\nasync fn render_page(css : String) -> String {\n  let page = @rabbita.new(fn() { page_component(css) })\n  page.render(url=\"http://127.0.0.1/\", timeout=5000)\n}")]),
+      plain("p", [txt("如果不想内联，也可以在构建期把 css 写入静态文件，再由 Rabbita 页面用普通的 stylesheet 链接加载；Rabbita 不是 PreCSS 的必需依赖。")]),
+    ]),
+    el("p", "developer-support", [txt("支持 SCSS · SASS · LESS · CSS")]),
+  ])
+}
+
 fn home_page() -> @rabbita.Val[@html.Html] {
   let (state, _emit) : (@rabbita.Val[Unit], @rabbita.Emit[Unit]) = @rabbita.create_pure_state((), update=(model, _msg) => model)
   state.view(_model => {
@@ -243,6 +287,7 @@ fn home_page() -> @rabbita.Val[@html.Html] {
       ["site.css?v=4", "tailwind.css", "codemirror/lib/codemirror.css", "codemirror/theme/dracula.css"],
       "site-dark",
       "",
+      false,
       false,
       plain("main", [
           el("section", "home-intro", [
@@ -255,7 +300,7 @@ fn home_page() -> @rabbita.Val[@html.Html] {
                   el("span", "home-flow-arrow", [txt("→")]),
                   el("span", "home-flow-output", [txt("CSS")]),
                 ]),
-                link("#try", "site-cta", "打开 Playground"),
+                link("getting-started/", "site-cta", "快速开始"),
               ]),
             ]),
             el("aside", "site-card performance-teaser performance-teaser-loading", [
@@ -267,7 +312,7 @@ fn home_page() -> @rabbita.Val[@html.Html] {
               link("benchmark/", "performance-teaser-link", "查看完整基准"),
             ]),
           ]),
-          el("p", "site-note home-note", [txt("写一段 SCSS、SASS 或 LESS，右侧即时生成 CSS。")]),
+          el("p", "site-note home-note", [txt("向下进入 Playground，实时编译你的第一段样式")]),
           editor(),
         ]),
       [
@@ -276,6 +321,28 @@ fn home_page() -> @rabbita.Val[@html.Html] {
         resource_script("./demo.js?v=4", Some("module")),
         resource_script("./home.js", Some("module")),
       ],
+    )
+  })
+}
+
+fn getting_started_page() -> @rabbita.Val[@html.Html] {
+  let (state, _emit) : (@rabbita.Val[Unit], @rabbita.Emit[Unit]) = @rabbita.create_pure_state((), update=(model, _msg) => model)
+  state.view(_model => {
+    site_shell(
+      "PreCSS 快速开始",
+      ["../site.css?v=4"],
+      "site-dark getting-started-page",
+      "../",
+      false,
+      true,
+      el("main", "getting-started-main", [
+        el("div", "getting-started-heading", [
+          page_heading("快速开始", "把 PreCSS 加入 MoonBit 项目，用几行代码编译第一段样式"),
+          link("../#try", "getting-started-back", "返回 Playground，实时试用"),
+        ]),
+        developer_start(),
+      ]),
+      [],
     )
   })
 }

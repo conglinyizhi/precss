@@ -1,4 +1,5 @@
-///| 预处理引擎句柄
+///|
+/// 预处理引擎句柄
 ///
 /// 每个后端构造一个 `Engine`，用函数闭包承载其行为。这是「可插拔契约」的载体：
 /// 门面 `Compiler` 只依赖 `Engine` 的 `supports` / `compile`，不关心是哪个后端。
@@ -9,7 +10,8 @@ pub struct Engine {
   compile_imports_fn : (String, (String) -> String raise CompileError) -> String raise CompileError
 }
 
-///| 构造一个引擎
+///|
+/// 构造一个引擎
 ///
 /// 三个回调分别返回引擎名、是否负责某格式、以及把源码编译为 CSS。
 pub fn Engine::new(
@@ -18,25 +20,37 @@ pub fn Engine::new(
   compile~ : (String) -> String raise CompileError,
   compile_imports~ : (String, (String) -> String raise CompileError) -> String raise CompileError,
 ) -> Engine {
-  { name_fn: name, supports_fn: supports, compile_fn: compile, compile_imports_fn: compile_imports }
+  {
+    name_fn: name,
+    supports_fn: supports,
+    compile_fn: compile,
+    compile_imports_fn: compile_imports,
+  }
 }
 
-///| 引擎名
+///|
+/// 引擎名
 pub fn Engine::engine_name(self : Engine) -> String {
   (self.name_fn)()
 }
 
-///| 是否负责某格式
+///|
+/// 是否负责某格式
 pub fn Engine::supports(self : Engine, fmt : Format) -> Bool {
   (self.supports_fn)(fmt)
 }
 
-///| 把源码编译为 CSS
-pub fn Engine::compile(self : Engine, source : String) -> String raise CompileError {
+///|
+/// 把源码编译为 CSS
+pub fn Engine::compile(
+  self : Engine,
+  source : String,
+) -> String raise CompileError {
   (self.compile_fn)(source)
 }
 
-///| 带 @import 内联地编译
+///|
+/// 带 @import 内联地编译
 pub fn Engine::compile_imports(
   self : Engine,
   source : String,
@@ -47,7 +61,8 @@ pub fn Engine::compile_imports(
 
 ///|
 
-///| 统一的编译错误
+///|
+/// 统一的编译错误
 ///
 /// 把各个后端引擎的错误统一成一种 `CompileError`，让调用方只需处理它。
 pub(all) suberror CompileError {
@@ -59,7 +74,10 @@ pub(all) suberror CompileError {
   UnsupportedSyntax(String)
 } derive(Debug)
 
+///|
 pub extend CompileError with @debug.Debug::{to_repr}
+
+///|
 pub extend CompileError with Show::{to_string, output}
 
 ///|
@@ -73,7 +91,8 @@ pub impl Show for CompileError with fn to_string(self) {
 
 ///|
 
-///| 支持的 CSS 预处理格式
+///|
+/// 支持的 CSS 预处理格式
 ///
 /// 分发给后端引擎的格式标签。
 pub(all) enum Format {
@@ -82,11 +101,17 @@ pub(all) enum Format {
   Css
 } derive(Debug, Eq)
 
+///|
 pub extend Format with @debug.Debug::{to_repr}
+
+///|
 pub extend Format with Eq::{equal, not_equal}
+
+///|
 pub extend Format with Show::{to_string, output}
 
-///| 启发式自动识别源码格式
+///|
+/// 启发式自动识别源码格式
 ///
 /// 优先判 SCSS（含 `$` 变量或 Sass 控制指令），其次判 LESS
 /// （`@name :` 变量定义），否则当作普通 CSS。
@@ -106,22 +131,8 @@ fn Format::looks_scss(source : String) -> Bool {
     return true
   }
   let controls = [
-    "@mixin",
-    "@include",
-    "@each",
-    "@for",
-    "@extend",
-    "@function",
-    "@use",
-    "@forward",
-    "@while",
-    "@at-root",
-    "@if",
-    "@else",
-    "@return",
-    "@debug",
-    "@warn",
-    "@error",
+    "@mixin", "@include", "@each", "@for", "@extend", "@function", "@use", "@forward",
+    "@while", "@at-root", "@if", "@else", "@return", "@debug", "@warn", "@error",
     "@content",
   ]
   for k in controls {
@@ -132,7 +143,8 @@ fn Format::looks_scss(source : String) -> Bool {
   false
 }
 
-///| 判断是否存在 LESS 变量定义（`@name : expr`）
+///|
+/// 判断是否存在 LESS 变量定义（`@name : expr`）
 fn Format::looks_less(source : String) -> Bool {
   let n = source.length()
   let mut i = 0
@@ -147,7 +159,8 @@ fn Format::looks_less(source : String) -> Bool {
   false
 }
 
-///| 判断 `source[i]`（为 `@`）处是否为 LESS 变量定义
+///|
+/// 判断 `source[i]`（为 `@`）处是否为 LESS 变量定义
 fn is_less_variable_at(source : String, i : Int) -> Bool {
   let n = source.length()
   let mut j = i + 1
@@ -185,7 +198,8 @@ pub impl Show for Format with fn to_string(self) {
 
 ///|
 
-///| 编译入口的输入形态
+///|
+/// 编译入口的输入形态
 ///
 /// 传给 `compile_input` 的输入，决定格式如何解析。
 pub(all) enum Input {
@@ -197,5 +211,8 @@ pub(all) enum Input {
   File(String)
 } derive(Debug, Eq)
 
+///|
 pub extend Input with @debug.Debug::{to_repr}
+
+///|
 pub extend Input with Eq::{equal, not_equal}

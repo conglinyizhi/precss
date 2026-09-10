@@ -5,7 +5,8 @@
 /// 把 LESS 转成 scss（变量 @→$、mixin .name(→@mixin/@include），复用 SCSS
 /// 引擎编译。
 
-///| 把 LESS 转成等价的 scss
+///|
+/// 把 LESS 转成等价的 scss
 pub fn less_to_scss(source : String) -> String {
   let sb = StringBuilder()
   let n = source.length()
@@ -75,7 +76,8 @@ pub fn less_to_scss(source : String) -> String {
   sb.to_string()
 }
 
-///| 读取括号参数到匹配 `)`，参数内 `@name` 转 `$name`；返回 (转后参数, `)` 后下标)
+///|
+/// 读取括号参数到匹配 `)`，参数内 `@name` 转 `$name`；返回 (转后参数, `)` 后下标)
 fn read_paren(source : String, open : Int, n : Int) -> (String, Int) {
   let p = StringBuilder()
   let mut depth = 1
@@ -119,17 +121,21 @@ fn read_paren(source : String, open : Int, n : Int) -> (String, Int) {
   (p.to_string(), k)
 }
 
-///| LESS 引擎：独立解析 + 求值（不复用 SCSS 引擎）
+///|
+/// LESS 引擎：独立解析 + 求值（不复用 SCSS 引擎）
 pub fn less_engine() -> @core.Engine {
   @core.Engine::new(
-    name = () => "less",
-    supports = (fmt) => fmt is @core.Less,
-    compile = (source) => eval_less(parse_less(@scss.tokenize(source)), None),
-    compile_imports = (source, read) => eval_less(parse_less(@scss.tokenize(source)), Some(read)),
+    name=() => "less",
+    supports=fmt => fmt is @core.Less,
+    compile=source => eval_less(parse_less(@scss.tokenize(source)), None),
+    compile_imports=(source, read) => {
+      eval_less(parse_less(@scss.tokenize(source)), Some(read))
+    },
   )
 }
 
-///| 是否为 LESS 保留的 at-rule 关键词（不当作变量）
+///|
+/// 是否为 LESS 保留的 at-rule 关键词（不当作变量）
 fn is_at_rule_keyword(name : String) -> Bool {
   match name {
     "media" => true
@@ -156,17 +162,20 @@ fn is_at_rule_keyword(name : String) -> Bool {
   }
 }
 
-///| 空白字符
+///|
+/// 空白字符
 fn is_ws(u : UInt16) -> Bool {
   u == 0x20 || u == 0x09 || u == 0x0A || u == 0x0D
 }
 
-///| 标识符起始字符
+///|
+/// 标识符起始字符
 fn is_ident_start(u : UInt16) -> Bool {
   (u >= 'A' && u <= 'Z') || (u >= 'a' && u <= 'z') || u == '_' || u == '-'
 }
 
-///| 标识符字符
+///|
+/// 标识符字符
 fn is_ident_char(u : UInt16) -> Bool {
   is_ident_start(u) || (u >= '0' && u <= '9')
 }

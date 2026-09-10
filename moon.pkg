@@ -1,8 +1,8 @@
 import {
   "conglinyizhi/precss/core",
-  "conglinyizhi/precss/backend/css" @css,
-  "conglinyizhi/precss/backend/scss" @scss,
-  "conglinyizhi/precss/backend/less" @less,
+  "conglinyizhi/precss/backend/css",
+  "conglinyizhi/precss/backend/scss",
+  "conglinyizhi/precss/backend/less",
 }
 
 import {

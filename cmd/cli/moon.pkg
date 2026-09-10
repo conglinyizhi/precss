@@ -1,14 +1,14 @@
 import {
   "conglinyizhi/precss" @mb,
-  "conglinyizhi/precss/backend/scss" @scss,
-  "conglinyizhi/precss/backend/less" @less,
-  "moonbitlang/core/env" @env,
-  "moonbitlang/core/bench" @bench,
-  "moonbitlang/core/json" @json,
-  "conglinyizhi/toml" @toml,
+  "conglinyizhi/precss/backend/scss",
+  "conglinyizhi/precss/backend/less",
+  "moonbitlang/core/env",
+  "moonbitlang/core/bench",
+  "moonbitlang/core/json",
+  "conglinyizhi/toml",
   "moonbitlang/async",
-  "moonbitlang/async/stdio" @stdio,
-  "moonbitlang/async/fs" @fs,
+  "moonbitlang/async/stdio",
+  "moonbitlang/async/fs",
 }
 
 supported_targets = "native"

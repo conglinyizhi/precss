@@ -4,12 +4,9 @@ import {
 
 pkgtype(kind: "foreign_library")
 
-options(link: {
-  "wasm-gc": {
-    "export-memory-name": "memory",
-    "use-js-builtin-string": true
+options(
+  link: {
+    "wasm-gc": { "export-memory-name": "memory", "use-js-builtin-string": true },
+    "wasm": { "export-memory-name": "memory" },
   },
-  "wasm": {
-    "export-memory-name": "memory"
-  }
-})
+)

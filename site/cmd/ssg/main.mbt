@@ -46,12 +46,19 @@ async fn main {
   let benchmark_html = try benchmark.render(url="http://127.0.0.1/benchmark/", timeout=5000) catch {
     _ => "<!DOCTYPE html><html><body>render error</body></html>"
   }
+  let getting_started = @rabbita.new(fn() { getting_started_page() })
+  let getting_started_html = try getting_started.render(url="http://127.0.0.1/getting-started/", timeout=5000) catch {
+    _ => "<!DOCTYPE html><html><body>render error</body></html>"
+  }
   // rabbit SSR 的 <head> 默认不带 charset，补一个避免中文/特殊字符按默认编码乱码
   let home_with_cs = home_html.replace(old="<head>", new="<head><meta charset=\"utf-8\">")
   let benchmark_with_cs = benchmark_html.replace(old="<head>", new="<head><meta charset=\"utf-8\">")
+  let getting_started_with_cs = getting_started_html.replace(old="<head>", new="<head><meta charset=\"utf-8\">")
   try @fs.write_file(output("index.html"), home_with_cs) catch { _ => () }
   try @fs.mkdir(output("benchmark"), recursive = true) catch { _ => () }
   try @fs.write_file(output("benchmark/index.html"), benchmark_with_cs) catch { _ => () }
+  try @fs.mkdir(output("getting-started"), recursive = true) catch { _ => () }
+  try @fs.write_file(output("getting-started/index.html"), getting_started_with_cs) catch { _ => () }
 }
 
 ///| 读文件为 utf8 文本（SSG 容错：失败返回空串）

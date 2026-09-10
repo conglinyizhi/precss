@@ -7,7 +7,8 @@
 /// 输入可以是完整 *.scss / *.sass 源码，也可以是零散片段。
 /// 无法解析的部分由 parser 归入 `Raw`，这里原样透传。
 
-///| 格式化 SCSS 源码，返回规范化排版
+///|
+/// 格式化 SCSS 源码，返回规范化排版
 pub fn format_scss(source : String) -> String {
   let nodes = parse_sheet(tokenize(source))
   let sb = StringBuilder()
@@ -22,7 +23,8 @@ pub fn format_scss(source : String) -> String {
   sb.to_string()
 }
 
-///| 把单个 Node 递归重打为 scss 文本（indent 为当前缩进层级）
+///|
+/// 把单个 Node 递归重打为 scss 文本（indent 为当前缩进层级）
 fn node_to_scss(node : Node, indent : Int) -> String {
   let sb = StringBuilder()
   match node {
@@ -136,14 +138,16 @@ fn node_to_scss(node : Node, indent : Int) -> String {
   sb.to_string()
 }
 
-///| 打印规则体（body 里各 node 已带各自尾部换行，直接追加即可）
+///|
+/// 打印规则体（body 里各 node 已带各自尾部换行，直接追加即可）
 fn write_body(sb : StringBuilder, body : Array[Node], indent : Int) -> Unit {
   for n in body {
     sb.write_string(node_to_scss(n, indent))
   }
 }
 
-///| 一条声明/变量定义的规范排版：`indent prop: value;`
+///|
+/// 一条声明/变量定义的规范排版：`indent prop: value;`
 fn decl_line(indent : Int, prop : String, vals : Array[String]) -> String {
   let sb = StringBuilder()
   sb.write_string(spaces(indent))
@@ -154,10 +158,11 @@ fn decl_line(indent : Int, prop : String, vals : Array[String]) -> String {
   sb.to_string()
 }
 
-///| 生成 indent 层级对应的缩进（每层 2 空格）
+///|
+/// 生成 indent 层级对应的缩进（每层 2 空格）
 fn spaces(n : Int) -> String {
   let mut out = ""
-  for _ in 0 ..< n {
+  for _ in 0..<n {
     out = out + "  "
   }
   out

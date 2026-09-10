@@ -1,4 +1,5 @@
-///| SCSS 子集的中间表示
+///|
+/// SCSS 子集的中间表示
 ///
 /// 一个自上而下、面向样式的 AST。声明与规则集共用 `Node`，
 /// 变量、mixin、控制流都作为一等节点，便于求值阶段展开。
@@ -31,11 +32,13 @@ pub(all) enum Node {
   Raw(String)
 } derive(Debug)
 
+///|
 pub extend Node with @debug.Debug::{to_repr}
 
 ///|
 
-///| SCSS 词法：把源码切成 token 序列
+///|
+/// SCSS 词法：把源码切成 token 序列
 ///
 /// token 以裸字符串表示（`$var`、`@mixin`、`1px`、`red`、`{`、`:`……），
 /// 便于上层 parser 直接用字符串字面匹配。注释与空白被丢弃。
@@ -83,7 +86,14 @@ pub fn tokenize(src : String) -> Array[String] {
     // 数字（含 .5、-2 等）
     if is_digit(c) || (c == '.' && i + 1 < n && is_digit(src[i + 1])) {
       let mut j = i
-      while j < n && (is_digit(src[j]) || src[j] == '.' || src[j] == '%' || src[j] == 'e' || src[j] == 'E') {
+      while j < n &&
+            (
+              is_digit(src[j]) ||
+              src[j] == '.' ||
+              src[j] == '%' ||
+              src[j] == 'e' ||
+              src[j] == 'E'
+            ) {
         j += 1
       }
       // 紧跟的字母单位（px / em / rem / vh / deg 等）并入数字 token
@@ -105,9 +115,13 @@ pub fn tokenize(src : String) -> Array[String] {
       continue
     }
     // 多字符运算符 `==` `!=` `>=` `<=`
-    if i + 1 < n && ((c == '=' && (src[i + 1] == '=' || src[i + 1] == '>')) ||
-      (c == '!' && src[i + 1] == '=') || (c == '>' && src[i + 1] == '=') ||
-      (c == '<' && src[i + 1] == '=')) {
+    if i + 1 < n &&
+      (
+        (c == '=' && (src[i + 1] == '=' || src[i + 1] == '>')) ||
+        (c == '!' && src[i + 1] == '=') ||
+        (c == '>' && src[i + 1] == '=') ||
+        (c == '<' && src[i + 1] == '=')
+      ) {
       toks.push(src[i:i + 2].to_owned())
       i += 2
       continue
@@ -138,7 +152,15 @@ pub fn tokenize(src : String) -> Array[String] {
     // 标识符 / 选择器字符
     if is_ident_start(c) || c == '#' || c == '.' || c == '%' || c == '&' {
       let mut j = i
-      while j < n && (is_ident_char(src[j]) || src[j] == '-' || src[j] == '.' || src[j] == '%' || src[j] == '&' || (src[j] == '#' && (j + 1 >= n || src[j + 1] != '{'))) {
+      while j < n &&
+            (
+              is_ident_char(src[j]) ||
+              src[j] == '-' ||
+              src[j] == '.' ||
+              src[j] == '%' ||
+              src[j] == '&' ||
+              (src[j] == '#' && (j + 1 >= n || src[j + 1] != '{'))
+            ) {
         j += 1
       }
       toks.push(src[i:j].to_owned())
@@ -152,34 +174,40 @@ pub fn tokenize(src : String) -> Array[String] {
   toks
 }
 
-///| 是否为空白字符
+///|
+/// 是否为空白字符
 fn is_ws(u : UInt16) -> Bool {
   u == 0x20 || u == 0x09 || u == 0x0A || u == 0x0D || u == 0x0C
 }
 
-///| 是否为十进制数字
+///|
+/// 是否为十进制数字
 fn is_digit(u : UInt16) -> Bool {
   u >= '0' && u <= '9'
 }
 
-///| 标识符起始字符
+///|
+/// 标识符起始字符
 fn is_ident_start(u : UInt16) -> Bool {
   (u >= 'A' && u <= 'Z') || (u >= 'a' && u <= 'z') || u == '_'
 }
 
-///| 标识符字符
+///|
+/// 标识符字符
 fn is_ident_char(u : UInt16) -> Bool {
   is_ident_start(u) || is_digit(u) || u == '-'
 }
 
-///| 字母字符
+///|
+/// 字母字符
 fn is_alpha(u : UInt16) -> Bool {
   (u >= 'A' && u <= 'Z') || (u >= 'a' && u <= 'z')
 }
 
 ///|
 
-///| SCSS 解析器：token 序列 → AST
+///|
+/// SCSS 解析器：token 序列 → AST
 ///
 /// 递归下降，自顶向下解析一个样式表。声明、规则集、变量、mixin、
 /// 控制流都作为 `Node` 产出。
@@ -188,7 +216,8 @@ priv struct Parser {
   mut pos : Int
 }
 
-///| 解析整个样式表
+///|
+/// 解析整个样式表
 pub fn parse_sheet(toks : Array[String]) -> Array[Node] {
   let p = Parser::new(toks)
   p.parse_block()
@@ -196,10 +225,11 @@ pub fn parse_sheet(toks : Array[String]) -> Array[Node] {
 
 ///|
 fn Parser::new(toks : Array[String]) -> Parser {
-  { toks, pos: 0 }
+  { toks, pos: 0, }
 }
 
-///| 当前 token（无则 None）
+///|
+/// 当前 token（无则 None）
 fn Parser::peek(self : Parser) -> String? {
   if self.pos < self.toks.length() {
     Some(self.toks[self.pos])
@@ -208,37 +238,39 @@ fn Parser::peek(self : Parser) -> String? {
   }
 }
 
-///| 取走当前 token
+///|
+/// 取走当前 token
 fn Parser::advance(self : Parser) -> String {
   let t = self.toks[self.pos]
   self.pos += 1
   t
 }
 
-///| 解析到块尾（`}` 或 EOF，不消费 `}`）
+///|
+/// 解析到块尾（`}` 或 EOF，不消费 `}`）
 fn Parser::parse_block(self : Parser) -> Array[Node] {
   let nodes : Array[Node] = []
   while true {
     match self.peek() {
       None => break
       Some("}") => break
-      Some(_) => {
+      Some(_) =>
         match self.parse_one() {
           Some(node) => nodes.push(node)
           None => break
         }
-      }
     }
   }
   nodes
 }
 
-///| 解析一个节点
+///|
+/// 解析一个节点
 fn Parser::parse_one(self : Parser) -> Node? {
   match self.peek() {
     None => None
     Some("}") => None
-    Some(first) => {
+    Some(first) =>
       if first.length() > 0 && first[0] == '$' {
         Some(self.parse_var())
       } else if first.length() > 0 && first[0] == '@' {
@@ -246,11 +278,11 @@ fn Parser::parse_one(self : Parser) -> Node? {
       } else {
         self.parse_decl_or_rule()
       }
-    }
   }
 }
 
-///| 变量定义 `$name : value ;`
+///|
+/// 变量定义 `$name : value ;`
 fn Parser::parse_var(self : Parser) -> Node {
   let name = self.advance()
   self.consume(":")
@@ -258,7 +290,8 @@ fn Parser::parse_var(self : Parser) -> Node {
   VarDef(name, value)
 }
 
-///| at-rule：mixins / 控制流 / 透传
+///|
+/// at-rule：mixins / 控制流 / 透传
 fn Parser::parse_at(self : Parser) -> Node? {
   let name = self.advance()
   if name == "@mixin" {
@@ -336,7 +369,8 @@ fn Parser::parse_at(self : Parser) -> Node? {
   return Some(AtRule(name, prelude, body))
 }
 
-///| 解析 `@else` / `@else if` 链（返回后续节点）
+///|
+/// 解析 `@else` / `@else if` 链（返回后续节点）
 fn Parser::parse_else_tail(self : Parser) -> Array[Node] {
   match self.peek() {
     Some("@else") => {
@@ -360,25 +394,23 @@ fn Parser::parse_else_tail(self : Parser) -> Array[Node] {
   }
 }
 
-///| 读取 `@each` 的变量名列表（$a, $b，逗号分隔）
+///|
+/// 读取 `@each` 的变量名列表（$a, $b，逗号分隔）
 fn Parser::read_each_vars(self : Parser) -> Array[String] {
   let vars : Array[String] = []
   while true {
     match self.peek() {
       Some("in") => break
-      Some(",") => {
-        self.pos += 1
-      }
+      Some(",") => self.pos += 1
       None => break
-      Some(_) => {
-        vars.push(self.advance())
-      }
+      Some(_) => vars.push(self.advance())
     }
   }
   vars
 }
 
-///| 读取 `@include` 的实参：括号内逗号分隔，每项 join 成一个字符串
+///|
+/// 读取 `@include` 的实参：括号内逗号分隔，每项 join 成一个字符串
 fn Parser::read_invoke_args(self : Parser) -> Array[String] {
   let out : Array[String] = []
   if self.peek() is Some("(") {
@@ -397,9 +429,7 @@ fn Parser::read_invoke_args(self : Parser) -> Array[String] {
           cur = fresh
         }
         None => break
-        Some(_) => {
-          cur.push(self.advance())
-        }
+        Some(_) => cur.push(self.advance())
       }
     }
     let last = cur.join(" ")
@@ -410,7 +440,8 @@ fn Parser::read_invoke_args(self : Parser) -> Array[String] {
   out
 }
 
-///| mixin 参数：`(a, b)` 或空
+///|
+/// mixin 参数：`(a, b)` 或空
 fn Parser::read_params(self : Parser) -> Array[String] {
   if self.peek() is Some("(") {
     self.pos += 1
@@ -430,9 +461,7 @@ fn Parser::read_params(self : Parser) -> Array[String] {
           cur = fresh
         }
         None => break
-        Some(_) => {
-          cur.push(self.advance())
-        }
+        Some(_) => cur.push(self.advance())
       }
     }
     return ps
@@ -440,7 +469,8 @@ fn Parser::read_params(self : Parser) -> Array[String] {
   []
 }
 
-///| 声明或规则集
+///|
+/// 声明或规则集
 fn Parser::parse_decl_or_rule(self : Parser) -> Node? {
   let head : Array[String] = []
   while true {
@@ -458,9 +488,7 @@ fn Parser::parse_decl_or_rule(self : Parser) -> Node? {
         return parse_decl(head)
       }
       Some("}") => break
-      Some(_) => {
-        head.push(self.advance())
-      }
+      Some(_) => head.push(self.advance())
     }
   }
   // 块结尾（} 或 EOF）：若形如 `name: value` 则按声明处理（SCSS 允许末尾声明省略分号）
@@ -470,7 +498,8 @@ fn Parser::parse_decl_or_rule(self : Parser) -> Node? {
   Some(Raw(head.join(" ")))
 }
 
-///| head 中是否含冒号
+///|
+/// head 中是否含冒号
 fn has_colon(head : Array[String]) -> Bool {
   for t in head {
     if t == ":" {
@@ -480,7 +509,8 @@ fn has_colon(head : Array[String]) -> Bool {
   false
 }
 
-///| 从 `name : value` 头解析声明
+///|
+/// 从 `name : value` 头解析声明
 fn parse_decl(head : Array[String]) -> Node? {
   let mut colon = -1
   let mut i = 0
@@ -500,7 +530,8 @@ fn parse_decl(head : Array[String]) -> Node? {
   Some(Decl(name, value))
 }
 
-///| 读取值，遇到 `;` 或 `}` 停止（`;` 被消费）
+///|
+/// 读取值，遇到 `;` 或 `}` 停止（`;` 被消费）
 fn Parser::read_value(self : Parser) -> Array[String] {
   let v : Array[String] = []
   while true {
@@ -511,15 +542,14 @@ fn Parser::read_value(self : Parser) -> Array[String] {
         break
       }
       Some("}") => break
-      Some(_) => {
-        v.push(self.advance())
-      }
+      Some(_) => v.push(self.advance())
     }
   }
   v
 }
 
-///| 读取到 `{` 为止（`{` 被消费）
+///|
+/// 读取到 `{` 为止（`{` 被消费）
 fn Parser::read_until_brace(self : Parser) -> Array[String] {
   let v : Array[String] = []
   while true {
@@ -529,25 +559,23 @@ fn Parser::read_until_brace(self : Parser) -> Array[String] {
         break
       }
       None => break
-      Some(_) => {
-        v.push(self.advance())
-      }
+      Some(_) => v.push(self.advance())
     }
   }
   v
 }
 
-///| 消费一个期望 token（若匹配则跳过；不匹配也容错前进）
+///|
+/// 消费一个期望 token（若匹配则跳过；不匹配也容错前进）
 fn Parser::consume(self : Parser, tok : String) -> Unit {
   match self.peek() {
-    Some(t) if t == tok => {
-      self.pos += 1
-    }
+    Some(t) if t == tok => self.pos += 1
     _ => ()
   }
 }
 
-///| 把 token 数组按 `,` 拆成一组选择器
+///|
+/// 把 token 数组按 `,` 拆成一组选择器
 fn split_selectors(tokens : Array[String]) -> Array[String] {
   let groups : Array[Array[String]] = []
   let mut cur : Array[String] = []
@@ -571,14 +599,19 @@ fn split_selectors(tokens : Array[String]) -> Array[String] {
   out
 }
 
-///| 把选择器 token join 成字符串，连接符前不加空格
+///|
+/// 把选择器 token join 成字符串，连接符前不加空格
 fn join_selector(tokens : Array[String]) -> String {
   let sb = StringBuilder()
   let mut prev = ""
   let mut first = true
   for t in tokens {
     if !first {
-      let prev_tail = if prev.length() > 0 { prev[prev.length() - 1] } else { 0 }
+      let prev_tail = if prev.length() > 0 {
+        prev[prev.length() - 1]
+      } else {
+        0
+      }
       let no_space = is_joiner(t) || is_joiner_char(prev_tail)
       if !no_space {
         sb.write_string(" ")
@@ -591,15 +624,35 @@ fn join_selector(tokens : Array[String]) -> String {
   sb.to_string()
 }
 
-///| 是否为会紧贴下一个 token 的选择器连接符字符
+///|
+/// 是否为会紧贴下一个 token 的选择器连接符字符
 fn is_joiner_char(u : UInt16) -> Bool {
-  u == '.' || u == ':' || u == '#' || u == '>' || u == '+' || u == '~' ||
-    u == '-' || u == '&' || u == '@' || u == '%'
+  u == '.' ||
+  u == ':' ||
+  u == '#' ||
+  u == '>' ||
+  u == '+' ||
+  u == '~' ||
+  u == '-' ||
+  u == '&' ||
+  u == '@' ||
+  u == '%'
 }
 
-///| 是否为选择器连接符（前不加空格）
+///|
+/// 是否为选择器连接符（前不加空格）
 fn is_joiner(t : String) -> Bool {
-  t == ":" || t == "." || t == "#" || t == "@" || t == "%" || t == "&" ||
-    t == ">" || t == "+" || t == "~" || t == "-" || t == "[" || t == "]" ||
-    t.has_prefix("#{")
+  t == ":" ||
+  t == "." ||
+  t == "#" ||
+  t == "@" ||
+  t == "%" ||
+  t == "&" ||
+  t == ">" ||
+  t == "+" ||
+  t == "~" ||
+  t == "-" ||
+  t == "[" ||
+  t == "]" ||
+  t.has_prefix("#{")
 }

@@ -1,4 +1,5 @@
-///| 从 CSS / SCSS / SASS(缩进) 源码提取所有 class 选择器名（去 `.` 前缀）
+///|
+/// 从 CSS / SCSS / SASS(缩进) 源码提取所有 class 选择器名（去 `.` 前缀）
 ///
 /// 供 `cmd/cli gen-types` 用：把用户样式里的 utility class（如 `.text-red-500`）
 /// 提取成 class 名（`text-red-500`），再生成类型化的 MoonBit wrapper。
@@ -8,6 +9,7 @@ pub fn extract_classes_scss(source : String) -> Array[String] {
   dedup(out)
 }
 
+///|
 fn collect_scss(nodes : Array[Node], out : Array[String]) -> Unit {
   for n in nodes {
     match n {
@@ -25,6 +27,7 @@ fn collect_scss(nodes : Array[Node], out : Array[String]) -> Unit {
   }
 }
 
+///|
 fn dedup(xs : Array[String]) -> Array[String] {
   let out : Array[String] = []
   for x in xs {

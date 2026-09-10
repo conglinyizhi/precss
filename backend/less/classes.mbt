@@ -1,4 +1,5 @@
-///| 从 LESS 源码提取所有 class 选择器名（去 `.` 前缀）
+///|
+/// 从 LESS 源码提取所有 class 选择器名（去 `.` 前缀）
 ///
 /// 供 `cmd/cli gen-types` 用（与 scss 侧对称）。
 pub fn extract_classes_less(source : String) -> Array[String] {
@@ -7,6 +8,7 @@ pub fn extract_classes_less(source : String) -> Array[String] {
   dedup(out)
 }
 
+///|
 fn collect_less(nodes : Array[LessNode], out : Array[String]) -> Unit {
   for n in nodes {
     match n {
@@ -24,6 +26,7 @@ fn collect_less(nodes : Array[LessNode], out : Array[String]) -> Unit {
   }
 }
 
+///|
 fn dedup(xs : Array[String]) -> Array[String] {
   let out : Array[String] = []
   for x in xs {
@@ -34,6 +37,7 @@ fn dedup(xs : Array[String]) -> Array[String] {
   out
 }
 
+///|
 fn contains_str(xs : Array[String], x : String) -> Bool {
   for y in xs {
     if y == x {

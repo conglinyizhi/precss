@@ -225,6 +225,79 @@ $note: #6a6570;
   }
 }
 
+// ── MoonBit 开发者入门：安装与最短 API 示例 ──
+.developer-start {
+  width: min(100% - 2rem, 1200px);
+  margin: 3rem auto 0;
+}
+.developer-start-heading {
+  max-width: 44rem;
+}
+.developer-start-heading h2 {
+  margin: 0 0 0.55rem;
+  color: $sub;
+  font-size: clamp(1.45rem, 3vw, 2rem);
+  letter-spacing: -0.02em;
+}
+.developer-start-heading p:last-child {
+  margin: 0;
+  color: $text;
+  line-height: 1.7;
+}
+.developer-kicker {
+  margin: 0 0 0.7rem;
+  color: #c084fc;
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+}
+.developer-start-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1rem;
+  margin-top: 1.35rem;
+}
+.developer-card {
+  min-width: 0;
+  padding: 1.25rem;
+  box-shadow: none;
+}
+.developer-card h3 {
+  margin: 0 0 0.55rem;
+  color: $sub;
+  font-size: 1rem;
+}
+.developer-card p {
+  margin: 0.55rem 0;
+  line-height: 1.6;
+}
+.developer-card code { color: #d8b4fe; }
+.developer-card pre {
+  box-sizing: border-box;
+  max-width: 100%;
+  margin: 0.85rem 0;
+  padding: 0.85rem 1rem;
+  overflow-x: auto;
+  background: $code-bg;
+  color: #e8e5e1;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.82rem;
+  line-height: 1.55;
+  white-space: pre;
+}
+.developer-rabbita {
+  max-width: 54rem;
+  margin-top: 1.2rem;
+}
+.developer-rabbita p { line-height: 1.7; }
+.developer-support {
+  margin: 0.65rem 0 0;
+  color: $note;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.75rem;
+  letter-spacing: 0.04em;
+}
+
 @keyframes performance-bar-rise {
   from { transform: scaleX(0); }
   to { transform: scaleX(1); }
@@ -601,11 +674,48 @@ $note: #6a6570;
     gap: 1rem;
     margin-top: 2rem;
   }
+  .developer-start { width: min(100% - 2rem, 1200px); margin-top: 2.2rem; }
+  .developer-start-grid { grid-template-columns: 1fr; }
   .home-hero { padding: 2rem 1.25rem 1.8rem; }
   .home-flow { flex-wrap: wrap; }
   .site-editor { grid-template-columns: 1fr; }
   .engine-control { top: 0; }
   .vars-bar-top { width: 100%; flex-wrap: wrap; }
+}
+
+// ── 快速开始页：沿用开发者卡片，只补页面标题与返回入口 ──
+.getting-started-main {
+  width: min(100% - 2rem, 1200px);
+  margin: 0 auto 4rem;
+}
+.getting-started-heading {
+  padding: 3.4rem 0 1.1rem;
+  border-bottom: 0;
+}
+.getting-started-heading .page-heading { margin: 0; }
+.getting-started-heading .site-title {
+  margin: 0 0 0.4rem;
+  text-align: left;
+  font-size: clamp(2.4rem, 5vw, 4rem);
+  letter-spacing: -0.03em;
+}
+.getting-started-heading .site-sub {
+  max-width: 42rem;
+  margin: 0;
+  text-align: left;
+}
+.getting-started-back {
+  display: inline-block;
+  margin-top: 1.1rem;
+  color: $title;
+  font-size: 0.85rem;
+  text-decoration: none;
+}
+.getting-started-back:hover { color: #fff; }
+.getting-started-main .developer-start {
+  width: auto;
+  margin-top: 1.6rem;
+  border-top: 0;
 }
 
 .benchmark-page {

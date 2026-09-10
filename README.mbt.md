@@ -15,55 +15,65 @@ moon add conglinyizhi/precss
 ## 快速开始
 
 ```mbt check
+///|
 test {
   // 自动识别格式编译
   inspect(
     @precss.compile("$c: red; body { color: $c; }"),
-    content=(#|body {
-    #|  color: red;
-    #|}
-    #|
+    content=(
+      #|body {
+      #|  color: red;
+      #|}
+      #|
     ),
   )
 }
 ```
 
 ```mbt check
+///|
 test {
   // SCSS 变量 + 嵌套
   inspect(
     @precss.compile_scss("$gap: 8px; a { margin: $gap; b { padding: $gap; } }"),
-    content=(#|a {
-    #|  margin: 8px;
-    #|}
-    #|a b {
-    #|  padding: 8px;
-    #|}
-    #|
+    content=(
+      #|a {
+      #|  margin: 8px;
+      #|}
+      #|a b {
+      #|  padding: 8px;
+      #|}
+      #|
     ),
   )
 }
 ```
 
 ```mbt check
+///|
 test {
   // LESS：变量 + 类 mixin（含参数默认值）
   inspect(
     @precss.compile_less(".pad(@p: 8px) { padding: @p; }\n.x { .pad(); }"),
-    content=(#|.x {
-    #|  padding: 8px;
-    #|}
-    #|
-    #|
+    content=(
+      #|.x {
+      #|  padding: 8px;
+      #|}
+      #|
+      #|
     ),
   )
 }
 ```
 
 ```mbt check
+///|
 test {
   // 显式指定为 CSS（透传）
-  inspect(@precss.compile_css("body { color: red; }"), content="body { color: red; }")
+  inspect(
+    @precss.compile_css("body { color: red; }"),
+    content="body { color: red; }",
+  )
 }
 ```
 
@@ -73,32 +83,42 @@ test {
 读取函数由调用方注入（`read : (path) -> String raise CompileError`），核心不耦合具体 IO。
 
 ```mbt check
+///|
 test {
   let read = fn(p : String) -> String raise @core.CompileError {
     if p == "a.scss" {
       "$c: blue; .x { color: $c; }"
     } else {
-      raise @core.CompileError::EngineFailed(engine="test", message="missing: " + p)
+      raise @core.CompileError::EngineFailed(
+        engine="test",
+        message="missing: " + p,
+      )
     }
   }
-  inspect(@precss.compile_many(
-    [@core.Input::Source("body { color: red; }"),
-     @core.Input::File("a.scss"),        // read 读取，内容里的 @import 也会内联
-     @core.Input::Source(".y { width: 1px; }")],
-    read,
-  ), content=(#|body {
-    #|  color: red;
-    #|}
-    #|
-    #|.x {
-    #|  color: blue;
-    #|}
-    #|
-    #|.y {
-    #|  width: 1px;
-    #|}
-    #|
-    ))
+  inspect(
+    @precss.compile_many(
+      [
+        @core.Input::Source("body { color: red; }"),
+        @core.Input::File("a.scss"), // read 读取，内容里的 @import 也会内联
+        @core.Input::Source(".y { width: 1px; }"),
+      ],
+      read,
+    ),
+    content=(
+      #|body {
+      #|  color: red;
+      #|}
+      #|
+      #|.x {
+      #|  color: blue;
+      #|}
+      #|
+      #|.y {
+      #|  width: 1px;
+      #|}
+      #|
+    ),
+  )
 }
 ```
 
@@ -177,7 +197,7 @@ node scripts/less_diff.mjs                       # less 自带 cases
 
 本库是**纯库**（String→String，无 IO）。嵌合发生在 rabbit 项目的**后端/构建期**：给它一个 `read` 从 scss 源码集合读取，`compile_many` 产出 CSS，再挂到静态资源或直接注入。
 
-```mbt
+```mbt nocheck
 // 在 rabbit 项目（后端 cmd/server 或独立构建工具）里
 let read = fn(p : String) -> String raise @core.CompileError {
   // 从构建期 scss 源码 map 读，或从文件系统读（读文件用 @fs，见下方坑）

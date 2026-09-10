@@ -1,5 +1,5 @@
 import {
   "conglinyizhi/precss/core",
-  "conglinyizhi/precss/backend/scss" @scss,
+  "conglinyizhi/precss/backend/scss",
   "moonbitlang/core/debug",
 }
