@@ -38,6 +38,16 @@ pub fn compile_file(
 }
 
 ///|
+/// 以显式 SASS 缩进语法编译
+///
+/// 缩进语法（无花括号、靠缩进嵌套）先规范化成等价 SCSS 再编译。
+/// 与 `compile_scss` 的区别只在解析方式：当源码没有 `$` 变量且带缩进时，
+/// `compile` 的自动识别也会走这条路。
+pub fn compile_sass(source : String) -> String raise @core.CompileError {
+  default().compile_with_format(source, @core.Sass)
+}
+
+///|
 /// 以显式 SCSS 格式编译
 pub fn compile_scss(source : String) -> String raise @core.CompileError {
   default().compile_with_format(source, @core.Scss)
@@ -55,6 +65,17 @@ pub fn compile_scss_with_vars(
   vars : Map[String, String],
 ) -> String raise @core.CompileError {
   compile_prefixed_vars(source, vars, prefix="$", compile_scss)
+}
+
+///|
+/// 以显式 SASS 缩进语法编译，并注入一组预置全局变量
+///
+/// SASS 与 SCSS 用同一套 `$name: value` 变量语法，前缀也是 `$`。
+pub fn compile_sass_with_vars(
+  source : String,
+  vars : Map[String, String],
+) -> String raise @core.CompileError {
+  compile_prefixed_vars(source, vars, prefix="$", compile_sass)
 }
 
 ///|
@@ -204,6 +225,7 @@ fn default() -> @core.Compiler {
   @core.Compiler::new([
     @css.css_engine(),
     @scss.scss_engine(),
+    @scss.sass_engine(),
     @less.less_engine(),
   ])
 }

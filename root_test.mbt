@@ -54,18 +54,16 @@ test "compile many" {
       ],
       read,
     ),
+    // 每段按自己的格式编译：纯粹的 CSS 段（无 $、无 @）走 css 引擎原样透传，
+    // 含 $ 的段走 SCSS 引擎。需要强制某段走哪个引擎时用 SourceWithFormat。
     content=(
-      #|body {
-      #|  color: red;
-      #|}
+      #|body { color: red; }
       #|
       #|.x {
       #|  color: red;
       #|}
       #|
-      #|.y {
-      #|  width: 1px;
-      #|}
+      #|.y { width: 1px; }
       #|
     ),
   )
@@ -205,4 +203,175 @@ test "minify_css 保留字符串值" {
     @precss.minify_css("a { content: \"a  b \"; }"),
     content="a{content:\"a  b \";}",
   )
+}
+
+///|
+/// SASS 缩进语法（无 `$`、无花括号）必须被自动识别，而不是当作 CSS 原样透传
+test "compile 自动识别 SASS 缩进语法" {
+  inspect(
+    @precss.compile(".box\n  color: red\n  margin: 8px\n"),
+    content=(
+      #|.box {
+      #|  color: red;
+      #|  margin: 8px;
+      #|}
+      #|
+    ),
+  )
+}
+
+///|
+/// 显式 SASS 入口（缩进语法）
+test "compile_sass 显式指定缩进语法" {
+  inspect(
+    @precss.compile_sass(".box\n  color: red\n"),
+    content=(
+      #|.box {
+      #|  color: red;
+      #|}
+      #|
+    ),
+  )
+}
+
+///|
+/// 缩进语法里的 `$` 变量照常生效
+test "compile_sass 支持变量" {
+  inspect(
+    @precss.compile_sass("$c: red\n.box\n  color: $c\n"),
+    content=(
+      #|.box {
+      #|  color: red;
+      #|}
+      #|
+    ),
+  )
+}
+
+///|
+/// 缩进判定必须排在 SCSS/LESS 之前：纯缩进源码两个特征都没有，
+/// 排在后面会落到 CSS
+test "Format::detect 识别缩进语法" {
+  inspect(@core.Format::detect(".box\n  color: red\n"), content="sass")
+  inspect(@core.Format::detect("$c: red\n.box\n  color: $c\n"), content="sass")
+  inspect(@core.Format::detect(".box { color: red; }"), content="css")
+  inspect(@core.Format::detect("$c: red;\n.box { color: $c; }"), content="scss")
+  inspect(@core.Format::detect("@c: red;\n.box { color: @c; }"), content="less")
+}
+
+///|
+/// compile_many 必须尊重 SourceWithFormat；此前它固定用 SCSS 引擎，
+/// 把 LESS 源码当 SCSS 编译，产出无意义结果且不报错
+test "compile_many 尊重 SourceWithFormat" {
+  // 这些用例不涉及文件输入，read 一旦被调用就是测试本身写错了
+  let read = fn(p : String) -> String raise @core.CompileError {
+    raise @core.CompileError::EngineFailed(
+      engine="test",
+      message="unexpected read: " + p,
+    )
+  }
+  inspect(
+    @precss.compile_many(
+      [
+        @core.Input::SourceWithFormat(
+          "@p: 8px;\n.x { padding: @p; }",
+          @core.Format::Less,
+        ),
+      ],
+      read,
+    ),
+    content=(
+      #|.x {
+      #|  padding: 8px;
+      #|}
+      #|
+      #|
+    ),
+  )
+}
+
+///|
+/// 同一批输入混用格式时，各段按各自的引擎编译
+test "compile_many 混用格式" {
+  // 这些用例不涉及文件输入，read 一旦被调用就是测试本身写错了
+  let read = fn(p : String) -> String raise @core.CompileError {
+    raise @core.CompileError::EngineFailed(
+      engine="test",
+      message="unexpected read: " + p,
+    )
+  }
+  inspect(
+    @precss.compile_many(
+      [
+        @core.Input::SourceWithFormat(".a\n  color: red\n", @core.Format::Sass),
+        @core.Input::SourceWithFormat(
+          "@p: 4px;\n.b { padding: @p; }",
+          @core.Format::Less,
+        ),
+      ],
+      read,
+    ),
+    content=(
+      #|.a {
+      #|  color: red;
+      #|}
+      #|
+      #|.b {
+      #|  padding: 4px;
+      #|}
+      #|
+      #|
+    ),
+  )
+}
+
+///|
+/// compile_file 必须把 reader 透传给 @import；此前它走 compile（不携带 reader），
+/// 源码里的 @import 被静默忽略——变量不生效、也不报错
+test "compile_file 内联 @import" {
+  let files : Map[String, String] = Map([
+    ("theme.scss", "$gap: 8px;\n$fg: #333;"),
+    ("main.scss", "@import \"theme.scss\";\nbody { margin: $gap; color: $fg; }"),
+  ])
+  let read = fn(path : String) -> String raise @core.CompileError {
+    match files.get(path) {
+      Some(s) => s
+      None =>
+        raise @core.CompileError::EngineFailed(
+          engine="test",
+          message="no such file: " + path,
+        )
+    }
+  }
+  inspect(
+    @precss.compile_file("main.scss", read),
+    content=(
+      #|body {
+      #|  margin: 8px;
+      #|  color: #333;
+      #|}
+      #|
+    ),
+  )
+}
+
+///|
+/// @import 的路径原样交给 reader，库不做扩展名补全
+test "compile_file 的 @import 路径原样传给 reader" {
+  let seen : Array[String] = []
+  let read = fn(path : String) -> String raise @core.CompileError {
+    seen.push(path)
+    if path == "entry.scss" {
+      "@import \"partials/base\";"
+    } else if path == "partials/base" {
+      "$gap: 4px;"
+    } else {
+      raise @core.CompileError::EngineFailed(
+        engine="test",
+        message="unexpected path: " + path,
+      )
+    }
+  }
+  ignore(@precss.compile_file("entry.scss", read))
+  inspect(seen.join(","), content="entry.scss,partials/base")
 }

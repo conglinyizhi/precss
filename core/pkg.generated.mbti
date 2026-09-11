@@ -42,12 +42,15 @@ pub fn Engine::new(name~ : () -> String, supports~ : (Format) -> Bool, compile~ 
 pub fn Engine::supports(Self, Format) -> Bool
 
 pub(all) enum Format {
+  Sass
   Scss
   Less
   Css
 } derive(Eq, @debug.Debug)
 pub fn Format::detect(String) -> Self
 pub fn Format::equal(Self, Self) -> Bool
+pub fn Format::from_path(String) -> Self?
+pub fn Format::looks_sass_indent(String) -> Bool
 pub fn Format::not_equal(Self, Self) -> Bool
 pub fn Format::output(Self, &Logger) -> Unit
 pub fn Format::to_repr(Self) -> @debug.Repr

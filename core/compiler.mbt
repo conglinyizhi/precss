@@ -60,15 +60,33 @@ pub fn Compiler::compile_many(
   inputs : Array[Input],
   read : (String) -> String raise CompileError,
 ) -> String raise CompileError {
-  let scss = self.pick(Scss)
   let parts : Array[String] = []
   for input in inputs {
-    let src = match input {
-      Source(s) => s
-      SourceWithFormat(s, _) => s
-      File(p) => read(p)
+    // 每段输入按自己的格式选引擎：SourceWithFormat 用显式格式，
+    // File 按扩展名，Source 走内容识别。不能统一挑一个引擎——LESS 源码
+    // 交给 SCSS 引擎会产出无意义的结果且不报错。
+    let (src, fmt) = match input {
+      Source(s) => (s, Format::detect(s))
+      SourceWithFormat(s, f) => (s, f)
+      File(p) => {
+        let s = read(p)
+        let f = match Format::from_path(p) {
+          Some(f) => f
+          None => Format::detect(s)
+        }
+        (s, f)
+      }
     }
-    parts.push(scss.compile_imports(src, read))
+    let piece = self.pick(fmt).compile_imports(src, read)
+    // 透传的 CSS 段不带结尾换行，编译出来的段带；统一补齐后再拼接，
+    // 否则拼接结果的段间空行时有时无。
+    parts.push(
+      if piece.length() > 0 && !piece.has_suffix("\n") {
+        piece + "\n"
+      } else {
+        piece
+      },
+    )
   }
   parts.join("\n")
 }
@@ -83,7 +101,15 @@ pub fn Compiler::compile_file(
   read : (String) -> String raise CompileError,
 ) -> String raise CompileError {
   let source = read(path)
-  self.compile(source)
+  // 路径优先：按扩展名定格式，认不出来才回退到内容启发式。
+  // 用内容判定会让无变量的 `.scss`（全是 @import 很常见）被当成 CSS 透传，
+  // @import 就不内联了。
+  // 也必须走 compile_imports 而不是 compile：后者不携带 reader。
+  let fmt = match Format::from_path(path) {
+    Some(f) => f
+    None => Format::detect(source)
+  }
+  self.pick(fmt).compile_imports(source, read)
 }
 
 ///|

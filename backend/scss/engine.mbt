@@ -12,18 +12,11 @@
 
 ///|
 /// 判断源码是否为 sass 缩进语法（无花括号 + 有缩进行）
+///
+/// 判定实现放在 core（`Format::looks_sass_indent`），`Format::detect` 也用它，
+/// 这里只做转发，避免两处启发式规则漂移。
 pub fn is_sass_indent(source : String) -> Bool {
-  let mut line_start = true
-  for c in source {
-    if c == '{' || c == '}' {
-      return false
-    }
-    if line_start && (c == ' ' || c == '\t') {
-      return true
-    }
-    line_start = c == '\n'
-  }
-  false
+  @core.Format::looks_sass_indent(source)
 }
 
 ///|
@@ -105,5 +98,22 @@ pub fn scss_engine() -> @core.Engine {
       to_css(parse_sheet(tokenize(source)))
     },
     compile_imports=(source, read) => compile_with_imports(source, read),
+  )
+}
+
+///|
+/// SASS 缩进语法引擎
+///
+/// 缩进语法先规范化成等价 SCSS，再复用同一条编译管线。
+/// 与 `scss_engine` 分开是因为 `Format` 里 Sass / Scss 是两个标签，
+/// 调用方可以显式要求按缩进语法解析，不必依赖自动识别。
+pub fn sass_engine() -> @core.Engine {
+  @core.Engine::new(
+    name=() => "sass",
+    supports=fmt => fmt is @core.Sass,
+    compile=source => to_css(parse_sheet(tokenize(sass_to_scss(source)))),
+    compile_imports=(source, read) => {
+      compile_with_imports(sass_to_scss(source), read)
+    },
   )
 }

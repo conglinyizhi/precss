@@ -20,6 +20,10 @@ pub fn compile_less_with_vars(String, Map[String, String]) -> String raise @core
 
 pub fn compile_many(Array[@core.Input], (String) -> String raise @core.CompileError) -> String raise @core.CompileError
 
+pub fn compile_sass(String) -> String raise @core.CompileError
+
+pub fn compile_sass_with_vars(String, Map[String, String]) -> String raise @core.CompileError
+
 pub fn compile_scss(String) -> String raise @core.CompileError
 
 pub fn compile_scss_with_vars(String, Map[String, String]) -> String raise @core.CompileError

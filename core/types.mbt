@@ -96,6 +96,8 @@ pub impl Show for CompileError with fn to_string(self) {
 ///
 /// 分发给后端引擎的格式标签。
 pub(all) enum Format {
+  /// SASS 缩进语法（无花括号，靠缩进表达嵌套）
+  Sass
   Scss
   Less
   Css
@@ -113,9 +115,16 @@ pub extend Format with Show::{to_string, output}
 ///|
 /// 启发式自动识别源码格式
 ///
-/// 优先判 SCSS（含 `$` 变量或 Sass 控制指令），其次判 LESS
-/// （`@name :` 变量定义），否则当作普通 CSS。
+/// 优先判 SASS 缩进语法（有行首缩进且全文无 `{}`），其次判 SCSS
+/// （含 `$` 变量或 Sass 控制指令），再判 LESS（`@name :` 变量定义），
+/// 否则当作普通 CSS。
+///
+/// 缩进判定必须排在最前：`.box\n  color: red` 这类纯缩进源码既没有 `$`
+/// 也没有花括号，若先判 SCSS/LESS 都会落到 CSS 而被当作普通 CSS 透传。
 pub fn Format::detect(source : String) -> Format {
+  if Format::looks_sass_indent(source) {
+    return Sass
+  }
   if Format::looks_scss(source) {
     return Scss
   }
@@ -123,6 +132,44 @@ pub fn Format::detect(source : String) -> Format {
     return Less
   }
   Css
+}
+
+///|
+/// 是否像 SASS 缩进语法：全文不含 `{}`，且存在行首缩进
+///
+/// 这是唯一的一处缩进判定实现，`backend/scss` 的 `is_sass_indent` 委托到这里。
+pub fn Format::looks_sass_indent(source : String) -> Bool {
+  let mut line_start = true
+  for c in source {
+    if c == '{' || c == '}' {
+      return false
+    }
+    if line_start && (c == ' ' || c == '\t') {
+      return true
+    }
+    line_start = c == '\n'
+  }
+  false
+}
+
+///|
+/// 按文件路径的扩展名判断格式；认不出来时返回 `None`
+///
+/// 编译**文件**时优先用它，而不是用内容启发式：`.scss` 里的 `@import`
+/// 要在编译期内联，而 `.css` 的 `@import` 应该原样留给浏览器——
+/// 只看内容的话，两者的区别（一个 `$` 变量都没有）是分不出来的。
+pub fn Format::from_path(path : String) -> Format? {
+  if path.has_suffix(".scss") {
+    Some(Scss)
+  } else if path.has_suffix(".sass") {
+    Some(Sass)
+  } else if path.has_suffix(".less") {
+    Some(Less)
+  } else if path.has_suffix(".css") {
+    Some(Css)
+  } else {
+    None
+  }
 }
 
 ///|
@@ -190,6 +237,7 @@ fn is_ident_char(u : UInt16) -> Bool {
 ///|
 pub impl Show for Format with fn to_string(self) {
   match self {
+    Sass => "sass"
     Scss => "scss"
     Less => "less"
     Css => "css"
