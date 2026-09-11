@@ -13,3 +13,6 @@ site/out/
 site/public/
 site/static/data/benchmark.json
 site/static/data/benchmark-lite.json
+
+# 本地工作清单，不入库
+todo.md
