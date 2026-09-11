@@ -15,14 +15,13 @@ permissions:
   contents: read
 
 env:
-  # 不钉工具链版本：还在快速演进，老版本会被上游清掉，追 latest 才有用。
-  # 代价是 .mbti 检查信号强度有限（见该 step）。
-  #
-  # example/webruntime/web 是 pkgtype foreign_library，native 目标必须能定位 C
-  # 工具链；不显式给的话 moonc 探测失败（会去找 /usr/bin/lib.exe）。
+  # 为什么需要 MOON_CC：moon 探测 C 编译器时按 cl → cc → gcc → clang 的顺序找，
+  # 而 `cl` 是 MSVC 的编译器名。Linux 上 `cliquer` 包会提供同名的 `/usr/bin/cl`
+  # （图论工具），moon 撞上它就误判为 MSVC 环境，转去找 `lib.exe` 而失败：
+  #   failed to resolve native archiver executable `/usr/bin/lib.exe`
+  # 显式指定编译器即可绕过这个撞名问题。
+  # MOON_AR / MOON_LD 非必需，实测只给 MOON_CC 就能过，故不写。
   MOON_CC: clang
-  MOON_AR: ar
-  MOON_LD: clang
 
 jobs:
   moonbit:

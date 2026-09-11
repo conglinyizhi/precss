@@ -18,10 +18,8 @@ permissions:
   contents: read
 
 env:
-  # 工具链追 latest，不钉版本（老版本会被上游清掉）
+  # 同 ci.yml：绕开 `cl`（cliquer 包）与 MSVC 编译器撞名导致的误判
   MOON_CC: clang
-  MOON_AR: ar
-  MOON_LD: clang
 
 jobs:
   diff:
