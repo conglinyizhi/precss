@@ -1,0 +1,75 @@
+# 差分合规门禁：precss 输出 vs dart-sass / less.js
+# 只挂自写用例集（当前基线 SCSS 24/24、LESS 11/11，全绿）。
+# 全量 sass-spec 不在这里跑 —— spec/operators、spec/directives 有已知缺口，恒红，
+# 那部分该走「记录通过率、只在倒退时告警」，不设 exit 门禁。
+name: Differential conformance
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: diff-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  # 工具链追 latest，不钉版本（老版本会被上游清掉）
+  MOON_CC: clang
+  MOON_AR: ar
+  MOON_LD: clang
+
+jobs:
+  diff:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Cache MoonBit toolchain
+        uses: actions/cache@v4
+        with:
+          path: ~/.moon
+          key: moon-${{ runner.os }}-${{ hashFiles('moon.mod') }}
+
+      - name: Install MoonBit
+        run: |
+          curl -fsSL https://cli.moonbitlang.com/install/unix.sh | bash
+          echo "$HOME/.moon/bin" >> "$GITHUB_PATH"
+
+      # checkout 里没有 .mooncakes/（已 gitignore），先让 moon 解析并拉取依赖
+      - name: moon update
+        run: moon update
+
+      # diff.mjs / less_diff.mjs 默认读这个路径下的 cli.exe，必须先构建。
+      # （脚本自身在 CLI 缺失时会报错退出，不是假绿；这一步是为了让失败点更直接）
+      - name: Build native CLI
+        run: moon build --target native cmd/cli
+
+      - name: Verify CLI artifact
+        run: test -x _build/native/debug/build/cmd/cli/cli.exe
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - name: Install Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - name: Install oracle deps (dart-sass / less.js)
+        run: pnpm install --frozen-lockfile
+
+      # 门禁：自写用例集必须全绿（基线 24/24）
+      - name: Diff vs dart-sass (test/cases)
+        run: node scripts/diff.mjs
+
+      # 门禁：自写用例集必须全绿（基线 11/11）
+      - name: Diff vs less.js (test/less_cases)
+        run: node scripts/less_diff.mjs

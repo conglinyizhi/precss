@@ -1,0 +1,76 @@
+# MoonBit 主链路门禁：check / test / fmt（接口漂移只提示，不阻断）
+# 与 diff.yml 拆开：依赖不同（这里只要 MoonBit）、失败原因要隔离
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  # 不钉工具链版本：还在快速演进，老版本会被上游清掉，追 latest 才有用。
+  # 代价是 .mbti 检查信号强度有限（见该 step）。
+  #
+  # example/webruntime/web 是 pkgtype foreign_library，native 目标必须能定位 C
+  # 工具链；不显式给的话 moonc 探测失败（会去找 /usr/bin/lib.exe）。
+  MOON_CC: clang
+  MOON_AR: ar
+  MOON_LD: clang
+
+jobs:
+  moonbit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Cache MoonBit toolchain
+        uses: actions/cache@v4
+        with:
+          path: ~/.moon
+          key: moon-${{ runner.os }}-${{ hashFiles('moon.mod') }}
+
+      - name: Install MoonBit
+        run: |
+          curl -fsSL https://cli.moonbitlang.com/install/unix.sh | bash
+          echo "$HOME/.moon/bin" >> "$GITHUB_PATH"
+
+      - name: Versions
+        run: |
+          moon version --all
+          clang --version | head -1
+
+      # checkout 里没有 .mooncakes/（已 gitignore），先让 moon 解析并拉取依赖
+      - name: moon update
+        run: moon update
+
+      - name: moon check
+        run: moon check --target native
+
+      - name: moon test
+        run: moon test --target native
+
+      - name: format check
+        run: moon fmt --check
+
+      # 只提示，不阻断。工具链追 latest，而 .mbti 内容随 moonc 版本漂移，
+      # 设成硬门禁就会拿上游的改动卡自己的 PR。
+      # 用 git status 而不是 git diff：git diff 看不到「未跟踪的 .mbti 被凭空生成」这种情况。
+      - name: interface drift check (.mbti, 仅提示)
+        run: |
+          moon info
+          if [ -n "$(git status --porcelain)" ]; then
+            echo "::group::moon info 产生的差异"
+            git status --short
+            git --no-pager diff
+            echo "::endgroup::"
+            echo "::warning::pkg.generated.mbti 有漂移。若是自己改了公开 API，跑 moon info 并提交；若只是工具链升级带来的，忽略即可"
+          else
+            echo ".mbti 无漂移"
+          fi
