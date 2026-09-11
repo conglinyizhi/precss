@@ -64,16 +64,33 @@ async fn read_stdin_all() -> String {
 }
 
 ///|
+/// 读批量协议：stdin 以 NUL 分隔多份输入（compile / compile-less）
+///
+/// 按 NUL 分块读，而不是逐行 `read_until("\n")` 再拼回去。
+/// `read_until` 每返回一段都要做一次 utf8 解码，逐行读一份 1 MiB 输入
+/// 会产生上万次分配——批量编译的主要开销就在这里，与编译本身无关。
+async fn read_stdin_cases() -> Array[String] {
+  let parts : Array[String] = []
+  while true {
+    match @stdio.stdin.read_until("\u0000") {
+      Some(chunk) => parts.push(chunk)
+      None => break
+    }
+  }
+  parts
+}
+
+///|
 /// compile：stdin 以 NUL 分隔多个 SCSS，逐一编译，NUL 分隔输出，失败输出 MB_ERROR
 async fn run_compile(args : Array[String]) -> Unit {
   let (vars, minify) = compile_flags(args)
-  let whole = read_stdin_all() catch {
+  let cases = read_stdin_cases() catch {
     e => {
       println("MB_ERROR: read \{e}")
       return
     }
   }
-  emit_batch(whole, fn(src : String) -> String {
+  emit_batch(cases, fn(src : String) -> String {
     let css = @mb.compile_scss_with_vars(src, vars) catch {
       e => "MB_ERROR: \{e}"
     }
@@ -90,13 +107,13 @@ async fn run_compile(args : Array[String]) -> Unit {
 async fn run_compile_less(args : Array[String]) -> Unit {
   let (vars, minify) = compile_flags(args)
   let prefix = less_prefix(vars)
-  let whole = read_stdin_all() catch {
+  let cases = read_stdin_cases() catch {
     e => {
       println("MB_ERROR: read \{e}")
       return
     }
   }
-  emit_batch(whole, fn(src : String) -> String {
+  emit_batch(cases, fn(src : String) -> String {
     let css = @mb.compile_less(prefix + src) catch { e => "MB_ERROR: \{e}" }
     if minify {
       @mb.minify_css(css)
@@ -108,14 +125,13 @@ async fn run_compile_less(args : Array[String]) -> Unit {
 
 ///|
 /// 把 NUL 分隔的一批源喂给编译函数，NUL 分隔回写
-fn emit_batch(whole : String, compile : (String) -> String) -> Unit {
-  let cases = whole.split("\u0000")
+fn emit_batch(cases : Array[String], compile : (String) -> String) -> Unit {
   let results : Array[String] = []
   for c in cases {
     if c.trim().length() == 0 {
       continue
     }
-    results.push(compile(c.to_owned()))
+    results.push(compile(c))
   }
   println(results.join("\u0000"))
 }
