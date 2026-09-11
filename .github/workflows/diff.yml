@@ -27,10 +27,10 @@ jobs:
   diff:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Cache MoonBit toolchain
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: ~/.moon
           key: moon-${{ runner.os }}-${{ hashFiles('moon.mod') }}
@@ -53,12 +53,12 @@ jobs:
         run: test -x _build/native/debug/build/cmd/cli/cli.exe
 
       - name: Install pnpm
-        uses: pnpm/action-setup@v4
+        uses: pnpm/action-setup@v5
         with:
           version: 10
 
       - name: Install Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v5
         with:
           node-version: 20
           cache: pnpm
