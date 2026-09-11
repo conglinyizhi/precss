@@ -283,7 +283,8 @@ async fn run_gen_types() -> Unit {
       return
     }
   }
-  println(@mb.generate_types(src))
+  let generated = @mb.generate_types(src) catch { e => "ERR: \{e}" }
+  println(generated)
 }
 
 ///|

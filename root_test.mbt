@@ -375,3 +375,59 @@ test "compile_file 的 @import 路径原样传给 reader" {
   ignore(@precss.compile_file("entry.scss", read))
   inspect(seen.join(","), content="entry.scss,partials/base")
 }
+
+///|
+/// 把编译结果或错误渲染成字符串，便于断言
+fn scss_out(src : String) -> String {
+  @precss.compile_scss(src) catch {
+    e => "ERR: " + e.to_string()
+  }
+}
+
+///|
+fn less_out(src : String) -> String {
+  @precss.compile_less(src) catch {
+    e => "ERR: " + e.to_string()
+  }
+}
+
+///|
+/// 未定义变量 / 未定义混入 / 残缺语法必须报错。
+/// 对照 oracle：dart-sass 对这些分别报 Undefined variable / Undefined mixin /
+/// Expected expression / expected "}"。以前它们被静默处理——原样输出、
+/// 丢弃整块、或产出空字符串。
+test "SCSS 静默错误改为显式报错" {
+  assert_true(scss_out(".a { color: $undef; }").contains("Undefined variable"))
+  assert_true(scss_out(".a { @include nope; }").contains("Undefined mixin"))
+  assert_true(scss_out(".a { width: 1px + ; }").contains("Expected expression"))
+  assert_true(scss_out(".a { width: ; }").contains("Expected expression"))
+  assert_true(scss_out(".a { color: red;").contains("expected \"}\""))
+  assert_true(
+    scss_out(".a { color: #{$undef}; }").contains("Undefined variable"),
+  )
+  assert_true(
+    scss_out(".a { @if $undef { color: red; } }").contains("Undefined variable"),
+  )
+}
+
+///|
+/// LESS 侧同理（对照 less.js：variable @x is undefined / Unrecognised input）
+test "LESS 静默错误改为显式报错" {
+  assert_true(
+    less_out(".a { color: @undef; }").contains("variable @undef is undefined"),
+  )
+  assert_true(less_out(".a { color: red;").contains("expected \"}\""))
+}
+
+///|
+/// 报错不能误伤正常语义：字符串连接、数值折叠、变量、合法嵌套都要照常工作
+test "显式报错没有误伤正常用例" {
+  assert_true(scss_out(".a { content: a + b; }").contains("content: ab"))
+  assert_true(scss_out(".a { width: 1px + 2px; }").contains("width: 3px"))
+  assert_true(scss_out("$c: red; .a { color: $c; }").contains("color: red"))
+  assert_true(scss_out(".a { .b { color: red; } }").contains(".a .b"))
+  assert_true(less_out("@c: red; .a { color: @c; }").contains("color: red"))
+  assert_true(
+    scss_out(".a { @if true { color: red; } }").contains("color: red"),
+  )
+}

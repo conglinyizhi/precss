@@ -9,15 +9,15 @@ import {
 // Values
 pub fn compile_with_imports(String, (String) -> String raise @core.CompileError) -> String raise @core.CompileError
 
-pub fn diagnose_scss(String) -> Array[String]
+pub fn diagnose_scss(String) -> Array[String] raise @core.CompileError
 
-pub fn extract_classes_scss(String) -> Array[String]
+pub fn extract_classes_scss(String) -> Array[String] raise @core.CompileError
 
-pub fn format_scss(String) -> String
+pub fn format_scss(String) -> String raise @core.CompileError
 
 pub fn is_sass_indent(String) -> Bool
 
-pub fn parse_sheet(Array[String]) -> Array[Node]
+pub fn parse_sheet(Array[String]) -> Array[Node] raise @core.CompileError
 
 pub fn sass_engine() -> @core.Engine
 
@@ -25,7 +25,7 @@ pub fn sass_to_scss(String) -> String
 
 pub fn scss_engine() -> @core.Engine
 
-pub fn to_css(Array[Node]) -> String
+pub fn to_css(Array[Node]) -> String raise @core.CompileError
 
 pub fn tokenize(String) -> Array[String]
 

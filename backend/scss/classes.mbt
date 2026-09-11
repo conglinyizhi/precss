@@ -3,7 +3,9 @@
 ///
 /// 供 `cmd/cli gen-types` 用：把用户样式里的 utility class（如 `.text-red-500`）
 /// 提取成 class 名（`text-red-500`），再生成类型化的 MoonBit wrapper。
-pub fn extract_classes_scss(source : String) -> Array[String] {
+pub fn extract_classes_scss(
+  source : String,
+) -> Array[String] raise @core.CompileError {
   let out : Array[String] = []
   collect_scss(parse_sheet(tokenize(source)), out)
   dedup(out)

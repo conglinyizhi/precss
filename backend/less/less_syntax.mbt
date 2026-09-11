@@ -30,7 +30,9 @@ pub extend LessNode with @debug.Debug::{to_repr}
 
 ///|
 /// LESS 解析入口：token 序列 → node 列表
-pub fn parse_less(toks : Array[String]) -> Array[LessNode] {
+pub fn parse_less(
+  toks : Array[String],
+) -> Array[LessNode] raise @core.CompileError {
   let p = LessParser::new(toks)
   p.parse_block()
 }
@@ -64,7 +66,9 @@ fn LessParser::advance(self : LessParser) -> String {
 
 ///|
 /// 解析到块尾（`}` 或 EOF，不消费 `}`）
-fn LessParser::parse_block(self : LessParser) -> Array[LessNode] {
+fn LessParser::parse_block(
+  self : LessParser,
+) -> Array[LessNode] raise @core.CompileError {
   let nodes : Array[LessNode] = []
   while true {
     match self.peek() {
@@ -82,7 +86,9 @@ fn LessParser::parse_block(self : LessParser) -> Array[LessNode] {
 
 ///|
 /// 解析一个节点
-fn LessParser::parse_one(self : LessParser) -> LessNode? {
+fn LessParser::parse_one(
+  self : LessParser,
+) -> LessNode? raise @core.CompileError {
   match self.peek() {
     None => None
     Some("}") => None
@@ -123,7 +129,9 @@ fn LessParser::parse_var(self : LessParser) -> LessNode {
 
 ///|
 /// at-rule：@media / @import / 透传
-fn LessParser::parse_at(self : LessParser) -> LessNode? {
+fn LessParser::parse_at(
+  self : LessParser,
+) -> LessNode? raise @core.CompileError {
   let name = strip_at(self.advance())
   if name == "import" {
     let path_tok = self.advance()
@@ -137,7 +145,7 @@ fn LessParser::parse_at(self : LessParser) -> LessNode? {
     Some("{") => {
       self.pos += 1
       let body = self.parse_block()
-      self.consume("}")
+      self.expect("}")
       Some(AtRule(name, prelude, body))
     }
     Some(";") => {
@@ -150,7 +158,9 @@ fn LessParser::parse_at(self : LessParser) -> LessNode? {
 
 ///|
 /// 类 mixin：`.name(...)` 定义（后接 `{`）或调用
-fn LessParser::parse_mixin(self : LessParser) -> LessNode? {
+fn LessParser::parse_mixin(
+  self : LessParser,
+) -> LessNode? raise @core.CompileError {
   let name = strip_dot(self.advance()) // `.name`
   self.consume("(")
   let params = self.read_paren_list()
@@ -158,7 +168,7 @@ fn LessParser::parse_mixin(self : LessParser) -> LessNode? {
     Some("{") => {
       self.pos += 1
       let body = self.parse_block()
-      self.consume("}")
+      self.expect("}")
       Some(MixinDef(name, params, body))
     }
     Some(";") => {
@@ -171,13 +181,15 @@ fn LessParser::parse_mixin(self : LessParser) -> LessNode? {
 
 ///|
 /// 声明或嵌套规则
-fn LessParser::parse_decl_or_rule(self : LessParser) -> LessNode? {
+fn LessParser::parse_decl_or_rule(
+  self : LessParser,
+) -> LessNode? raise @core.CompileError {
   let head = self.read_head()
   match self.peek() {
     Some("{") => {
       self.pos += 1
       let body = self.parse_block()
-      self.consume("}")
+      self.expect("}")
       Some(RuleSet(head, body))
     }
     Some(";") => {
@@ -326,6 +338,30 @@ fn LessParser::peek_at(self : LessParser, off : Int) -> String? {
 fn LessParser::consume(self : LessParser, tok : String) -> Unit {
   if self.peek() is Some(t) && t == tok {
     self.pos += 1
+  }
+}
+
+///|
+/// 消费指定 token；当前位置不是它时报错
+///
+/// 与 SCSS 侧同理：`consume` 对缺失的 `}` 是静默跳过的，未闭合的块会一路
+/// 解析成空块，最后输出空字符串而不是报错。
+fn LessParser::expect(
+  self : LessParser,
+  tok : String,
+) -> Unit raise @core.CompileError {
+  match self.peek() {
+    Some(t) if t == tok => self.pos += 1
+    Some(t) =>
+      raise @core.CompileError::EngineFailed(
+        engine="less",
+        message="expected \"" + tok + "\", found \"" + t + "\"",
+      )
+    None =>
+      raise @core.CompileError::EngineFailed(
+        engine="less",
+        message="expected \"" + tok + "\"",
+      )
   }
 }
 

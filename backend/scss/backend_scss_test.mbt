@@ -1,6 +1,6 @@
 ///|
 /// SCSS 子集的黑盒测试
-fn compile(src : String) -> String {
+fn compile(src : String) -> String raise @core.CompileError {
   @scss.to_css(@scss.parse_sheet(@scss.tokenize(src)))
 }
 

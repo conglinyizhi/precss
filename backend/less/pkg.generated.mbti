@@ -7,17 +7,17 @@ import {
 }
 
 // Values
-pub fn diagnose_less(String) -> Array[String]
+pub fn diagnose_less(String) -> Array[String] raise @core.CompileError
 
 pub fn eval_less(Array[LessNode], ((String) -> String raise @core.CompileError)?) -> String raise @core.CompileError
 
-pub fn extract_classes_less(String) -> Array[String]
+pub fn extract_classes_less(String) -> Array[String] raise @core.CompileError
 
 pub fn less_engine() -> @core.Engine
 
 pub fn less_to_scss(String) -> String
 
-pub fn parse_less(Array[String]) -> Array[LessNode]
+pub fn parse_less(Array[String]) -> Array[LessNode] raise @core.CompileError
 
 // Errors
 

@@ -2,7 +2,9 @@
 /// 从 LESS 源码提取所有 class 选择器名（去 `.` 前缀）
 ///
 /// 供 `cmd/cli gen-types` 用（与 scss 侧对称）。
-pub fn extract_classes_less(source : String) -> Array[String] {
+pub fn extract_classes_less(
+  source : String,
+) -> Array[String] raise @core.CompileError {
   let out : Array[String] = []
   collect_less(parse_less(@scss.tokenize(source)), out)
   dedup(out)

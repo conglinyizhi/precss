@@ -32,7 +32,7 @@ pub fn compile_sources(Array[String]) -> String raise @core.CompileError
 
 pub fn compile_with_format(String, @core.Format) -> String raise @core.CompileError
 
-pub fn generate_types(String) -> String
+pub fn generate_types(String) -> String raise @core.CompileError
 
 pub fn minify_css(String) -> String
 

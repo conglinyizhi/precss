@@ -3,7 +3,7 @@
 ///
 /// 纯诊断函数，不改动编译结果。LESS 编译会对同名同值声明去重（保留最后一次），
 /// 这里提示用户避免手误产生预期不符。
-pub fn diagnose_less(source : String) -> Array[String] {
+pub fn diagnose_less(source : String) -> Array[String] raise @core.CompileError {
   let warns : Array[String] = []
   let nodes = parse_less(@scss.tokenize(source))
   scan_less_block(nodes, "", warns)

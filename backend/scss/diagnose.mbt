@@ -4,7 +4,7 @@
 /// 纯诊断函数，不改动编译结果。用于提示用户：重复的 `prop: val` 可能是手误
 /// （LESS 会去重同名同值；scss 保留但输出与前一条相同，属无意义重复）。
 /// 返回消息数组（空表示无问题）。
-pub fn diagnose_scss(source : String) -> Array[String] {
+pub fn diagnose_scss(source : String) -> Array[String] raise @core.CompileError {
   let warns : Array[String] = []
   let nodes = parse_sheet(tokenize(source))
   scan_scss_block(nodes, "", warns)

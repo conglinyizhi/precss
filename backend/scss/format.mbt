@@ -9,7 +9,7 @@
 
 ///|
 /// 格式化 SCSS 源码，返回规范化排版
-pub fn format_scss(source : String) -> String {
+pub fn format_scss(source : String) -> String raise @core.CompileError {
   let nodes = parse_sheet(tokenize(source))
   let sb = StringBuilder()
   let mut first = true

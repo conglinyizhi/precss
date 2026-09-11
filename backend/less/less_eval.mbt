@@ -404,7 +404,10 @@ fn split_args(s : String) -> Array[String] {
 
 ///|
 /// 求值一个值 token 序列：替换 @var + 合并数字运算
-fn eval_value(toks : Array[String], env : Env) -> String {
+fn eval_value(
+  toks : Array[String],
+  env : Env,
+) -> String raise @core.CompileError {
   // 单 token 普通值无需变量解析或运算折叠。
   if toks.length() == 1 {
     let t = toks[0]
@@ -412,17 +415,27 @@ fn eval_value(toks : Array[String], env : Env) -> String {
       return t
     }
   }
-  let resolved : Array[String] = toks.map(fn(t) { resolve_at(t, env) })
+  // 用循环而不是 map：resolve_at 现在会 raise，匿名函数要跟着标 raise 类型，
+  // 循环在函数体内直接调用更直接
+  let resolved : Array[String] = []
+  for t in toks {
+    resolved.push(resolve_at(t, env))
+  }
   merge_math(resolved)
 }
 
 ///|
 /// 把 `@name` token 替换为变量值
-fn resolve_at(t : String, env : Env) -> String {
+fn resolve_at(t : String, env : Env) -> String raise @core.CompileError {
   if t.length() > 0 && t[0] == '@' {
     let name = strip_at(t)
     match lookup_var(env, name) {
-      None => t
+      None =>
+        // 措辞对齐 less.js：variable @x is undefined
+        raise @core.CompileError::EngineFailed(
+          engine="less",
+          message="variable " + t + " is undefined",
+        )
       Some(val) => eval_value(val, env) // lazy：使用时递归求值
     }
   } else {

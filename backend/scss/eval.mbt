@@ -17,7 +17,7 @@ priv struct Env {
 
 ///|
 /// 编译样式表为 CSS
-pub fn to_css(nodes : Array[Node]) -> String {
+pub fn to_css(nodes : Array[Node]) -> String raise @core.CompileError {
   let env = Env::new()
   let sb = StringBuilder()
   gen(nodes, [], env, sb)
@@ -87,7 +87,10 @@ fn Env::define_var(
 
 ///|
 /// 在作用域内运行 `f`
-fn with_scope(env : Env, f : () -> Unit) -> Unit {
+fn with_scope(
+  env : Env,
+  f : () -> Unit raise @core.CompileError,
+) -> Unit raise @core.CompileError {
   Env::push_scope(env)
   f()
   Env::pop_scope(env)
@@ -102,14 +105,18 @@ fn gen_mixin_call(
   parent : Array[String],
   env : Env,
   sb : StringBuilder,
-) -> Unit {
+) -> Unit raise @core.CompileError {
   match env.mixins.get(name) {
     Some(m) =>
       with_scope(env, () => {
         bind_params(m, args, env)
         gen(replace_content(m.body, content), parent, env, sb)
       })
-    None => ()
+    None =>
+      raise @core.CompileError::EngineFailed(
+        engine="scss",
+        message="Undefined mixin.",
+      )
   }
 }
 
@@ -175,7 +182,11 @@ fn parse_flags(value : Array[String]) -> (Array[String], Bool, Bool) {
 
 ///|
 /// 处理一个变量定义节点
-fn apply_vardef(env : Env, name : String, value : Array[String]) -> Unit {
+fn apply_vardef(
+  env : Env,
+  name : String,
+  value : Array[String],
+) -> Unit raise @core.CompileError {
   let (cleaned, is_default, is_global) = parse_flags(value)
   let resolved = resolve(cleaned, env)
   Env::define_var(env, name, [resolved], is_default, is_global)
@@ -188,7 +199,7 @@ fn gen(
   parent : Array[String],
   env : Env,
   sb : StringBuilder,
-) -> Unit {
+) -> Unit raise @core.CompileError {
   for n in nodes {
     match n {
       RuleSet(sel, body) => gen_ruleset(sel, body, parent, env, sb)
@@ -226,7 +237,7 @@ fn gen_ruleset(
   parent : Array[String],
   env : Env,
   sb : StringBuilder,
-) -> Unit {
+) -> Unit raise @core.CompileError {
   let full = combine(parent, sel)
   let decl_lines : Array[String] = []
   let struct_nodes : Array[Node] = []
@@ -252,7 +263,7 @@ fn gen_struct(
   parent : Array[String],
   env : Env,
   sb : StringBuilder,
-) -> Unit {
+) -> Unit raise @core.CompileError {
   match node {
     RuleSet(sel, body) => gen_ruleset(sel, body, parent, env, sb)
     AtRule(name, prelude, body) => emit_atrule(name, prelude, body, env, sb)
@@ -291,7 +302,7 @@ fn emit_atrule(
   body : Array[Node],
   env : Env,
   sb : StringBuilder,
-) -> Unit {
+) -> Unit raise @core.CompileError {
   let at_name = if name.has_prefix("@") { name } else { "@" + name }
   sb.write_string("\{at_name} \{join_value(prelude, env)} {\n")
   with_scope(env, () => gen(body, [], env, sb))
@@ -306,7 +317,7 @@ fn split_body(
   env : Env,
   decl_lines : Array[String],
   struct_nodes : Array[Node],
-) -> Unit {
+) -> Unit raise @core.CompileError {
   for n in body {
     match n {
       Decl(name, value) => decl_lines.push("\{name}: \{resolve(value, env)};")
@@ -326,7 +337,11 @@ fn split_body(
                 struct_nodes,
               )
             })
-          None => ()
+          None =>
+            raise @core.CompileError::EngineFailed(
+              engine="scss",
+              message="Undefined mixin: " + name,
+            )
         }
       If(cond, tb, eb) => {
         let chosen = choose_branch(cond, tb, eb, env)
@@ -365,7 +380,7 @@ fn choose_branch(
   tb : Array[Node],
   eb : Array[Node],
   env : Env,
-) -> Array[Node] {
+) -> Array[Node] raise @core.CompileError {
   if eval_truthy(cond, env) {
     tb
   } else {
@@ -381,7 +396,7 @@ fn expand_for(
   to : Array[String],
   body : Array[Node],
   env : Env,
-) -> Array[Node] {
+) -> Array[Node] raise @core.CompileError {
   let a = to_int(resolve(from, env))
   let b = to_int(resolve(to, env))
   let out : Array[Node] = []
@@ -408,7 +423,7 @@ fn expand_each(
   list : Array[String],
   body : Array[Node],
   env : Env,
-) -> Array[Node] {
+) -> Array[Node] raise @core.CompileError {
   let out : Array[Node] = []
   let list_src = deref_each_list(list, env)
   if vars.length() == 1 {
@@ -496,7 +511,7 @@ fn gen_while(
   parent : Array[String],
   env : Env,
   sb : StringBuilder,
-) -> Unit {
+) -> Unit raise @core.CompileError {
   let mut iter = 0
   while eval_truthy(cond, env) && iter < 1000 {
     iter += 1
@@ -506,7 +521,10 @@ fn gen_while(
 
 ///|
 /// 把选择器数组里的插值 `#{$var}` 求值后 join
-fn join_resolved(selectors : Array[String], env : Env) -> String {
+fn join_resolved(
+  selectors : Array[String],
+  env : Env,
+) -> String raise @core.CompileError {
   // 常规选择器没有插值时直接复用数组 join，跳过逐项扫描和临时数组。
   let mut has_interp = false
   for s in selectors {
@@ -527,7 +545,7 @@ fn join_resolved(selectors : Array[String], env : Env) -> String {
 
 ///|
 /// 对选择器字符串里的 `#{$var}` 插值求值
-fn resolve_sel_interp(s : String, env : Env) -> String {
+fn resolve_sel_interp(s : String, env : Env) -> String raise @core.CompileError {
   if !s.contains("#{") {
     return s
   }
@@ -731,7 +749,10 @@ fn subst_toks(toks : Array[String], v : String, val : String) -> Array[String] {
 
 ///|
 /// 计算条件真假：非空、非 false
-fn eval_truthy(cond : Array[String], env : Env) -> Bool {
+fn eval_truthy(
+  cond : Array[String],
+  env : Env,
+) -> Bool raise @core.CompileError {
   v_bool(e_expr(cond, env))
 }
 
@@ -767,7 +788,14 @@ fn to_int(s : String) -> Int {
 
 ///|
 /// 变量替换 + 值拼接
-fn resolve(toks : Array[String], env : Env) -> String {
+fn resolve(toks : Array[String], env : Env) -> String raise @core.CompileError {
+  // 空的声明值（`width: ;`）是残缺表达式，dart-sass 也报 Expected expression.
+  if toks.length() == 0 {
+    raise @core.CompileError::EngineFailed(
+      engine="scss",
+      message="Expected expression.",
+    )
+  }
   // 单 token 的普通值无需经过 StringBuilder，直接复用原 token。
   if toks.length() == 1 {
     let t = toks[0]
@@ -784,14 +812,22 @@ fn resolve(toks : Array[String], env : Env) -> String {
     if t.length() > 0 && t[0] == '$' {
       match Env::get_var(env, t) {
         Some(v) => parts.push(resolve(v, env))
-        None => parts.push(t)
+        None =>
+          raise @core.CompileError::EngineFailed(
+            engine="scss",
+            message="Undefined variable: " + t,
+          )
       }
     } else if t.length() > 2 && t.has_prefix("#{") && t.has_suffix("}") {
       let inner = t[2:t.length() - 1].to_owned()
       if inner.length() > 0 && inner[0] == '$' {
         match Env::get_var(env, inner) {
           Some(v) => parts.push(resolve(v, env))
-          None => parts.push(t)
+          None =>
+            raise @core.CompileError::EngineFailed(
+              engine="scss",
+              message="Undefined variable: " + inner,
+            )
         }
       } else {
         parts.push(t)
@@ -855,12 +891,20 @@ fn is_ident_ish(s : String) -> Bool {
 
 ///|
 /// 值 token 序列化：运算符及其相邻 token 紧密拼接
-fn join_value_tokens(parts : Array[String]) -> String {
+fn join_value_tokens(parts : Array[String]) -> String raise @core.CompileError {
   let sb = StringBuilder()
   let mut prev_is_op = false
   for i, t in parts {
     if t == "+" {
-      // 字符串连接：去除 +，且让前后 token 紧密（c + d -> cd）
+      // 字符串连接：去除 +，且让前后 token 紧密（c + d -> cd）。
+      // 但 `+` 必须有右操作数——`width: 1px + ;` 这种残缺表达式以前会把
+      // `+` 静静丢掉，产出一个看起来正常的声明，没有任何报错。
+      if i + 1 >= parts.length() {
+        raise @core.CompileError::EngineFailed(
+          engine="scss",
+          message="Expected expression.",
+        )
+      }
       prev_is_op = true
       continue
     }
@@ -885,7 +929,10 @@ fn is_paren(t : String) -> Bool {
 }
 
 ///|
-fn join_value(toks : Array[String], env : Env) -> String {
+fn join_value(
+  toks : Array[String],
+  env : Env,
+) -> String raise @core.CompileError {
   resolve(toks, env)
 }
 
@@ -999,18 +1046,21 @@ priv enum CondVal {
   NumV(Int)
   BoolV(Bool)
   StrV(String)
-  NilV
 }
 
 ///|
 /// 求值整个表达式（条件用），返回 CondVal
-fn e_expr(toks : Array[String], env : Env) -> CondVal {
+fn e_expr(toks : Array[String], env : Env) -> CondVal raise @core.CompileError {
   let (v, _) = e_or(toks, 0, env)
   v
 }
 
 ///|
-fn e_or(toks : Array[String], pos : Int, env : Env) -> (CondVal, Int) {
+fn e_or(
+  toks : Array[String],
+  pos : Int,
+  env : Env,
+) -> (CondVal, Int) raise @core.CompileError {
   let (c0, i0) = e_and(toks, pos, env)
   let mut cur = c0
   let mut i = i0
@@ -1023,7 +1073,11 @@ fn e_or(toks : Array[String], pos : Int, env : Env) -> (CondVal, Int) {
 }
 
 ///|
-fn e_and(toks : Array[String], pos : Int, env : Env) -> (CondVal, Int) {
+fn e_and(
+  toks : Array[String],
+  pos : Int,
+  env : Env,
+) -> (CondVal, Int) raise @core.CompileError {
   let (c0, i0) = e_cmp(toks, pos, env)
   let mut cur = c0
   let mut i = i0
@@ -1036,7 +1090,11 @@ fn e_and(toks : Array[String], pos : Int, env : Env) -> (CondVal, Int) {
 }
 
 ///|
-fn e_cmp(toks : Array[String], pos : Int, env : Env) -> (CondVal, Int) {
+fn e_cmp(
+  toks : Array[String],
+  pos : Int,
+  env : Env,
+) -> (CondVal, Int) raise @core.CompileError {
   let (l0, i0) = e_add(toks, pos, env)
   let mut lhs = l0
   let mut i = i0
@@ -1050,7 +1108,11 @@ fn e_cmp(toks : Array[String], pos : Int, env : Env) -> (CondVal, Int) {
 }
 
 ///|
-fn e_add(toks : Array[String], pos : Int, env : Env) -> (CondVal, Int) {
+fn e_add(
+  toks : Array[String],
+  pos : Int,
+  env : Env,
+) -> (CondVal, Int) raise @core.CompileError {
   let (c0, i0) = e_mul(toks, pos, env)
   let mut cur = c0
   let mut i = i0
@@ -1064,7 +1126,11 @@ fn e_add(toks : Array[String], pos : Int, env : Env) -> (CondVal, Int) {
 }
 
 ///|
-fn e_mul(toks : Array[String], pos : Int, env : Env) -> (CondVal, Int) {
+fn e_mul(
+  toks : Array[String],
+  pos : Int,
+  env : Env,
+) -> (CondVal, Int) raise @core.CompileError {
   let (c0, i0) = e_unary(toks, pos, env)
   let mut cur = c0
   let mut i = i0
@@ -1080,7 +1146,11 @@ fn e_mul(toks : Array[String], pos : Int, env : Env) -> (CondVal, Int) {
 
 ///|
 /// 一元：not / 负号 / primary
-fn e_unary(toks : Array[String], pos : Int, env : Env) -> (CondVal, Int) {
+fn e_unary(
+  toks : Array[String],
+  pos : Int,
+  env : Env,
+) -> (CondVal, Int) raise @core.CompileError {
   if pos < toks.length() && toks[pos] == "not" {
     let (v, i) = e_unary(toks, pos + 1, env)
     return (v_not(v), i)
@@ -1095,9 +1165,16 @@ fn e_unary(toks : Array[String], pos : Int, env : Env) -> (CondVal, Int) {
 
 ///|
 /// primary：数字 / 变量 / 布尔 / 字符串 / 括号
-fn e_primary(toks : Array[String], pos : Int, env : Env) -> (CondVal, Int) {
+fn e_primary(
+  toks : Array[String],
+  pos : Int,
+  env : Env,
+) -> (CondVal, Int) raise @core.CompileError {
   if pos >= toks.length() {
-    return (StrV(""), pos)
+    raise @core.CompileError::EngineFailed(
+      engine="scss",
+      message="Expected expression.",
+    )
   }
   let t = toks[pos]
   if t == "(" {
@@ -1122,7 +1199,11 @@ fn e_primary(toks : Array[String], pos : Int, env : Env) -> (CondVal, Int) {
         let inner = resolve(v, env)
         return e_expr_at(tokenize_str(inner), 0, env)
       }
-      None => return (NilV, pos + 1)
+      None =>
+        raise @core.CompileError::EngineFailed(
+          engine="scss",
+          message="Undefined variable: " + t,
+        )
     }
   }
   // 数字：去掉单位取整
@@ -1135,7 +1216,11 @@ fn e_primary(toks : Array[String], pos : Int, env : Env) -> (CondVal, Int) {
 
 ///|
 /// 在给定位置求值表达式（跳过已匹配的括号起始）
-fn e_expr_at(toks : Array[String], pos : Int, env : Env) -> (CondVal, Int) {
+fn e_expr_at(
+  toks : Array[String],
+  pos : Int,
+  env : Env,
+) -> (CondVal, Int) raise @core.CompileError {
   e_or(toks, pos, env)
 }
 
@@ -1279,7 +1364,6 @@ fn v_bool(v : CondVal) -> Bool {
     BoolV(b) => b
     NumV(n) => n != 0
     StrV(s) => s.length() > 0
-    NilV => false
   }
 }
 

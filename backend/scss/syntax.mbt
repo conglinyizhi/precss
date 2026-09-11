@@ -218,7 +218,9 @@ priv struct Parser {
 
 ///|
 /// 解析整个样式表
-pub fn parse_sheet(toks : Array[String]) -> Array[Node] {
+pub fn parse_sheet(
+  toks : Array[String],
+) -> Array[Node] raise @core.CompileError {
   let p = Parser::new(toks)
   p.parse_block()
 }
@@ -248,7 +250,7 @@ fn Parser::advance(self : Parser) -> String {
 
 ///|
 /// 解析到块尾（`}` 或 EOF，不消费 `}`）
-fn Parser::parse_block(self : Parser) -> Array[Node] {
+fn Parser::parse_block(self : Parser) -> Array[Node] raise @core.CompileError {
   let nodes : Array[Node] = []
   while true {
     match self.peek() {
@@ -266,7 +268,7 @@ fn Parser::parse_block(self : Parser) -> Array[Node] {
 
 ///|
 /// 解析一个节点
-fn Parser::parse_one(self : Parser) -> Node? {
+fn Parser::parse_one(self : Parser) -> Node? raise @core.CompileError {
   match self.peek() {
     None => None
     Some("}") => None
@@ -292,14 +294,14 @@ fn Parser::parse_var(self : Parser) -> Node {
 
 ///|
 /// at-rule：mixins / 控制流 / 透传
-fn Parser::parse_at(self : Parser) -> Node? {
+fn Parser::parse_at(self : Parser) -> Node? raise @core.CompileError {
   let name = self.advance()
   if name == "@mixin" {
     let mixin_name = self.advance()
     let params = self.read_params()
     self.consume("{")
     let body = self.parse_block()
-    self.consume("}")
+    self.expect("}")
     return Some(MixinDef(mixin_name, params, body))
   }
   if name == "@include" {
@@ -308,7 +310,7 @@ fn Parser::parse_at(self : Parser) -> Node? {
     let content = if self.peek() is Some("{") {
       self.pos += 1
       let b = self.parse_block()
-      self.consume("}")
+      self.expect("}")
       b
     } else {
       []
@@ -330,7 +332,7 @@ fn Parser::parse_at(self : Parser) -> Node? {
   if name == "@if" {
     let cond = self.read_until_brace()
     let body = self.parse_block()
-    self.consume("}")
+    self.expect("}")
     let else_body = self.parse_else_tail()
     return Some(If(cond, body, else_body))
   }
@@ -341,7 +343,7 @@ fn Parser::parse_at(self : Parser) -> Node? {
     self.consume("to")
     let to = self.read_until_brace()
     let body = self.parse_block()
-    self.consume("}")
+    self.expect("}")
     return Some(For(var_name, from, to, body))
   }
   if name == "@each" {
@@ -349,13 +351,13 @@ fn Parser::parse_at(self : Parser) -> Node? {
     self.consume("in")
     let list = self.read_until_brace()
     let body = self.parse_block()
-    self.consume("}")
+    self.expect("}")
     return Some(Each(vars, list, body))
   }
   if name == "@while" {
     let cond = self.read_until_brace()
     let body = self.parse_block()
-    self.consume("}")
+    self.expect("}")
     return Some(While(cond, body))
   }
   if name == "@else" {
@@ -365,13 +367,15 @@ fn Parser::parse_at(self : Parser) -> Node? {
   // 其余 at-rule（@media / @supports 等）透传
   let prelude = self.read_until_brace()
   let body = self.parse_block()
-  self.consume("}")
+  self.expect("}")
   return Some(AtRule(name, prelude, body))
 }
 
 ///|
 /// 解析 `@else` / `@else if` 链（返回后续节点）
-fn Parser::parse_else_tail(self : Parser) -> Array[Node] {
+fn Parser::parse_else_tail(
+  self : Parser,
+) -> Array[Node] raise @core.CompileError {
   match self.peek() {
     Some("@else") => {
       ignore(self.advance())
@@ -380,13 +384,13 @@ fn Parser::parse_else_tail(self : Parser) -> Array[Node] {
         ignore(self.advance())
         let cond = self.read_until_brace()
         let body = self.parse_block()
-        self.consume("}")
+        self.expect("}")
         let tail = self.parse_else_tail()
         return [If(cond, body, tail)]
       } else {
         self.consume("{")
         let eb = self.parse_block()
-        self.consume("}")
+        self.expect("}")
         return eb
       }
     }
@@ -471,7 +475,7 @@ fn Parser::read_params(self : Parser) -> Array[String] {
 
 ///|
 /// 声明或规则集
-fn Parser::parse_decl_or_rule(self : Parser) -> Node? {
+fn Parser::parse_decl_or_rule(self : Parser) -> Node? raise @core.CompileError {
   let head : Array[String] = []
   while true {
     match self.peek() {
@@ -480,7 +484,7 @@ fn Parser::parse_decl_or_rule(self : Parser) -> Node? {
         self.pos += 1
         let selectors = split_selectors(head)
         let body = self.parse_block()
-        self.consume("}")
+        self.expect("}")
         return Some(RuleSet(selectors, body))
       }
       Some(";") => {
@@ -571,6 +575,27 @@ fn Parser::consume(self : Parser, tok : String) -> Unit {
   match self.peek() {
     Some(t) if t == tok => self.pos += 1
     _ => ()
+  }
+}
+
+///|
+/// 消费指定 token；当前位置不是它时报错
+///
+/// 用于「块必须闭合」这类场景——`consume` 对缺失的 `}` 是静默跳过的，
+/// 未闭合的规则集会一路解析成空块，最后输出空字符串而不是报错。
+fn Parser::expect(self : Parser, tok : String) -> Unit raise @core.CompileError {
+  match self.peek() {
+    Some(t) if t == tok => self.pos += 1
+    Some(t) =>
+      raise @core.CompileError::EngineFailed(
+        engine="scss",
+        message="expected \"" + tok + "\", found \"" + t + "\"",
+      )
+    None =>
+      raise @core.CompileError::EngineFailed(
+        engine="scss",
+        message="expected \"" + tok + "\"",
+      )
   }
 }
 

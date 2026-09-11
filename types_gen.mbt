@@ -3,8 +3,10 @@
 ///
 /// 流程：自动识别格式 → 编译成 css（展开 @each/插值成字面 .m-0 等）→ 提取全部 class
 /// → 生成 `pub fn xxx() -> String { "xxx" }`。第三方在 build/SSG 里调用，写盘成 .mbt。
-pub fn generate_types(source : String) -> String {
-  let css = compile(source) catch { _ => "" }
+pub fn generate_types(source : String) -> String raise @core.CompileError {
+  // 编译错误必须往上传：以前用 catch 吞成空串，结果样式写错时会静默生成
+  // 一个没有任何 class 的 wrapper，调用方完全看不出是编译失败了。
+  let css = compile(source)
   let classes = @scss.extract_classes_scss(css)
   gen_type_wrapper(classes)
 }
