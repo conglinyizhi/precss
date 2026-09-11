@@ -13,6 +13,9 @@ pub(all) suberror CompileError {
   EngineFailed(engine~ : String, message~ : String)
   UnsupportedSyntax(String)
 } derive(@debug.Debug)
+pub fn CompileError::output(Self, &Logger) -> Unit
+pub fn CompileError::to_repr(Self) -> @debug.Repr
+pub fn CompileError::to_string(Self) -> String
 pub impl Show for CompileError
 
 // Types and methods
@@ -44,6 +47,11 @@ pub(all) enum Format {
   Css
 } derive(Eq, @debug.Debug)
 pub fn Format::detect(String) -> Self
+pub fn Format::equal(Self, Self) -> Bool
+pub fn Format::not_equal(Self, Self) -> Bool
+pub fn Format::output(Self, &Logger) -> Unit
+pub fn Format::to_repr(Self) -> @debug.Repr
+pub fn Format::to_string(Self) -> String
 pub impl Show for Format
 
 pub(all) enum Input {
@@ -51,6 +59,9 @@ pub(all) enum Input {
   SourceWithFormat(String, Format)
   File(String)
 } derive(Eq, @debug.Debug)
+pub fn Input::equal(Self, Self) -> Bool
+pub fn Input::not_equal(Self, Self) -> Bool
+pub fn Input::to_repr(Self) -> @debug.Repr
 
 // Type aliases
 

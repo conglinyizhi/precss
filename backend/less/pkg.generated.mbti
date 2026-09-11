@@ -1,0 +1,39 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "conglinyizhi/precss/backend/less"
+
+import {
+  "conglinyizhi/precss/core",
+  "moonbitlang/core/debug",
+}
+
+// Values
+pub fn diagnose_less(String) -> Array[String]
+
+pub fn eval_less(Array[LessNode], ((String) -> String raise @core.CompileError)?) -> String raise @core.CompileError
+
+pub fn extract_classes_less(String) -> Array[String]
+
+pub fn less_engine() -> @core.Engine
+
+pub fn less_to_scss(String) -> String
+
+pub fn parse_less(Array[String]) -> Array[LessNode]
+
+// Errors
+
+// Types and methods
+pub(all) enum LessNode {
+  RuleSet(Array[String], Array[LessNode])
+  Decl(String, Array[String])
+  VarDef(String, Array[String])
+  MixinDef(String, Array[String], Array[LessNode])
+  MixinCall(String, Array[String])
+  AtRule(String, Array[String], Array[LessNode])
+  Import(String)
+  Raw(String)
+} derive(@debug.Debug)
+pub fn LessNode::to_repr(Self) -> @debug.Repr
+
+// Type aliases
+
+// Traits

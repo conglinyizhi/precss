@@ -45,6 +45,7 @@ pub(all) enum Node {
   AtRule(String, Array[String], Array[Node])
   Raw(String)
 } derive(@debug.Debug)
+pub fn Node::to_repr(Self) -> @debug.Repr
 
 // Type aliases
 
