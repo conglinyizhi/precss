@@ -347,7 +347,7 @@ async function main() {
       '输入由 manifest 描述的固定 seed 确定性生成，三种语法逻辑等价',
       '仅在双方输出归一化后一致时计入性能结果',
       'Dart Sass 对比项是 sass npm 包的 JavaScript API，不是 Dart Sass 原生 CLI',
-      'precss 的 SASS 入口当前先将缩进语法转换为 SCSS 再编译',
+      'precss 的 SASS 入口先把缩进语法规范化成等价 SCSS 再进同一条管线，数字含这段转换开销',
       'memory.resources 是独立资源测量，不计入性能耗时；目前仅 Linux 提供峰值 RSS',
     ],
     results: runs,

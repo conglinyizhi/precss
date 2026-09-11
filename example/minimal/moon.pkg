@@ -1,0 +1,8 @@
+import {
+  "conglinyizhi/precss",
+  "conglinyizhi/precss/core",
+}
+
+supported_targets = "native"
+
+pkgtype(kind: "executable")
