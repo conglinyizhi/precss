@@ -117,7 +117,6 @@ test "less mixin" {
       #|  border-radius: 5px;
       #|}
       #|
-      #|
     ),
   )
 }
@@ -136,7 +135,6 @@ test "less mixin 默认值" {
       #|.y {
       #|  padding: 12px;
       #|}
-      #|
       #|
     ),
   )
@@ -175,7 +173,15 @@ test "compile_less_with_vars 注入变量" {
   ) catch {
     _ => ""
   }
-  inspect(css, content=".a {\n  color: red;\n}\n\n")
+  inspect(
+    css,
+    content=(
+      #|.a {
+      #|  color: red;
+      #|}
+      #|
+    ),
+  )
 }
 
 ///|
@@ -285,7 +291,6 @@ test "compile_many 尊重 SourceWithFormat" {
       #|  padding: 8px;
       #|}
       #|
-      #|
     ),
   )
 }
@@ -319,7 +324,6 @@ test "compile_many 混用格式" {
       #|.b {
       #|  padding: 4px;
       #|}
-      #|
       #|
     ),
   )

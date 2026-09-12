@@ -21,7 +21,6 @@ test "variable" {
       #|  color: red;
       #|}
       #|
-      #|
     ),
   )
 }
@@ -35,7 +34,6 @@ test "lazy scope" {
       #|  color: red;
       #|}
       #|
-      #|
     ),
   )
 }
@@ -48,7 +46,6 @@ test "last definition wins" {
       #|body {
       #|  color: blue;
       #|}
-      #|
       #|
     ),
   )
@@ -66,7 +63,6 @@ test "nested rule" {
       #|  color: blue;
       #|}
       #|
-      #|
     ),
   )
 }
@@ -83,7 +79,6 @@ test "parent selector" {
       #|  color: blue;
       #|}
       #|
-      #|
     ),
   )
 }
@@ -99,7 +94,6 @@ test "parent selector suffix" {
       #|.a.on {
       #|  color: blue;
       #|}
-      #|
       #|
     ),
   )
@@ -118,7 +112,6 @@ test "paramless mixin call" {
       #|  color: red;
       #|}
       #|
-      #|
     ),
   )
 }
@@ -136,7 +129,6 @@ test "paramless mixin call with parens" {
       #|  color: red;
       #|}
       #|
-      #|
     ),
   )
 }
@@ -153,7 +145,6 @@ test "paramless mixin call without semicolon" {
       #|.a {
       #|  color: red;
       #|}
-      #|
       #|
     ),
   )
@@ -173,7 +164,6 @@ test "mixin call after declaration" {
       #|  color: red;
       #|}
       #|
-      #|
     ),
   )
 }
@@ -192,7 +182,6 @@ test "mixin call before declaration" {
       #|  width: 1px;
       #|}
       #|
-      #|
     ),
   )
 }
@@ -205,7 +194,6 @@ test "mixin with params" {
       #|.a {
       #|  width: 10px;
       #|}
-      #|
       #|
     ),
   )
@@ -221,7 +209,6 @@ test "arithmetic" {
       #|  padding: 6px;
       #|}
       #|
-      #|
     ),
   )
 }
@@ -234,7 +221,6 @@ test "pseudo class selector" {
       #|.a:hover {
       #|  color: red;
       #|}
-      #|
       #|
     ),
   )
@@ -249,7 +235,6 @@ test "selector list" {
       #|  color: red;
       #|}
       #|
-      #|
     ),
   )
 }
@@ -262,7 +247,6 @@ test "child combinator" {
       #|.a > .b {
       #|  color: red;
       #|}
-      #|
       #|
     ),
   )
@@ -296,7 +280,6 @@ test "defined mixin does not raise" {
       #|  color: red;
       #|}
       #|
-      #|
     ),
   )
 }
@@ -315,7 +298,6 @@ test "media" {
       #|}
       #|
       #|}
-      #|
       #|
     ),
   )
@@ -338,7 +320,6 @@ test "functional parens keep tight" {
       #|  opacity: .12;
       #|}
       #|
-      #|
     ),
   )
 }
@@ -355,7 +336,6 @@ test "function value keeps tight" {
       #|.x {
       #|  box-shadow: 0px 3px 1px -2px var(--o, rgba(0, 0, 0, .2)), 0px 2px 2px 0px #000;
       #|}
-      #|
       #|
     ),
   )
@@ -384,7 +364,6 @@ test "calc keeps its own arithmetic" {
       #|.d {
       #|  e: calc((var(--x) + 2px) / 3);
       #|}
-      #|
       #|
     ),
   )

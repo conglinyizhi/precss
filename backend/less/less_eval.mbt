@@ -19,7 +19,26 @@ pub fn eval_less(
   let env = new_scope(nodes, None)
   let sb = StringBuilder()
   ignore(gen_block(nodes, "", env, read, sb))
-  sb.to_string()
+  normalize_tail(sb.to_string())
+}
+
+///|
+/// 统一尾换行：块之间保留空行，末尾只留一个 `\n`
+///
+/// `gen_block` 在每个写出的节点后补一个分隔 `\n`，顶层最后一个节点会多出
+/// 一个尾换行：less 引擎吐 2 个、scss 引擎吐 1 个，于是 `compile_many`
+/// 拼接时 scss 段和 less 段的段落间距参差。这里只修尾巴，不动块间空行。
+fn normalize_tail(s : String) -> String {
+  let mut end = s.length()
+  while end > 0 && s[end - 1] == '\n' {
+    end -= 1
+  }
+  if end == 0 {
+    // 空串或只剩换行
+    ""
+  } else {
+    s[0:end].to_owned() + "\n"
+  }
 }
 
 ///|
