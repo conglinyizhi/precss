@@ -25,7 +25,7 @@ jobs:
         shell: bash
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: 安装 MoonBit
         run: |
@@ -36,7 +36,7 @@ jobs:
         run: moon update
 
       - name: 安装 pnpm
-        uses: pnpm/action-setup@v4
+        uses: pnpm/action-setup@v5
         with:
           version: 10
 
@@ -113,7 +113,7 @@ jobs:
           cp _build/wasm-gc/debug/build/example/webruntime/wasm/wasm.wasm site/out/web.wasm
 
       - name: Upload Pages artifact
-        uses: actions/upload-pages-artifact@v3
+        uses: actions/upload-pages-artifact@v5
         with:
           path: site/out
 
@@ -125,4 +125,4 @@ jobs:
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - id: deployment
-        uses: actions/deploy-pages@v4
+        uses: actions/deploy-pages@v5
