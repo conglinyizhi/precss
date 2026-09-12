@@ -6,9 +6,11 @@
     "diff": "node scripts/diff.mjs",
     "bench": "node example/perf/bench.mjs --profile quick",
     "bench:release": "node scripts/bench-release.mjs",
-    "site:dev": "node scripts/site-dev.mjs"
+    "vendor:codemirror": "node scripts/vendor-codemirror.mjs",
+    "site:dev": "node scripts/vendor-codemirror.mjs && node scripts/site-dev.mjs"
   },
   "devDependencies": {
+    "codemirror": "^5.65.21",
     "less": "^4.9.1",
     "sass": "^1.77.0"
   }

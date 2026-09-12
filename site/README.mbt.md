@@ -65,12 +65,17 @@ pub fn text_red(self : TW) -> TW { self.add("text-red") }
 
 ## 构建
 
-生产静态构建仍由 SSG 完成：
+生产静态构建由 SSG 完成。CodeMirror 不入库，是构建期从 npm 取的，先装依赖并取一次：
 
 ```bash
+pnpm install                 # 仓库根
+pnpm run vendor:codemirror   # node_modules/codemirror -> site/static/codemirror
 cd site && moon run cmd/ssg
-# 产出 out/index.html（rabbit SSR 完整 HTML）+ out/tailwind.css（本库编译）
+# 产出 out/index.html（rabbit SSR 完整 HTML）+ out/tailwind.css（本库编译）+ out/codemirror/
 ```
+
+> 少了 `vendor:codemirror` 这一步，SSG 会**直接报错退出**——不会静默产出一个
+> 没有编辑器的页面。`site/static/codemirror/` 已 gitignore。
 
 本地开发使用 Warren 提供 HTTP、文件监听和浏览器自动刷新。首次使用前安装 Warren：
 
@@ -89,3 +94,4 @@ pnpm run site:dev
 - `moonbit-community/rabbita`（Web UI / SSR）
 - `moonbitlang/async`（async / fs）
 - `conglinyizhi/precss`（库：编译 SCSS + `generate_types`，经 `moon.work` 本地挂载）
+- `codemirror@5`（npm devDependency，仅静态资源：构建期拷进 `static/codemirror/`）

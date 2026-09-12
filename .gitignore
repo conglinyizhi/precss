@@ -18,5 +18,8 @@ site/static/data/benchmark-lite.json
 example/webruntime/web.js
 example/webruntime/wasm-gc/web.wasm
 
+# 站点第三方静态资源（构建期从 npm 取，scripts/vendor-codemirror.mjs）
+site/static/codemirror/
+
 # 本地工作清单，不入库
 todo.md

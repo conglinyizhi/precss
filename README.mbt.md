@@ -256,6 +256,7 @@ let css = @precss.compile_many(
 `site/` 是**独立演示站项目**（rabbit SSG + 自研 tailwind-like，`site/out` 产物）：
 
 ```bash
+pnpm install && pnpm run vendor:codemirror   # 仓库根：CodeMirror 构建期从 npm 取（不入库）
 cd site && moon run cmd/ssg   # 读 styles/tailwind.scss → 本库编译出 out/tailwind.css；rabbit 渲染 out/index.html
 ```
 

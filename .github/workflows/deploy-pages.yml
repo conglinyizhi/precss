@@ -43,6 +43,10 @@ jobs:
       - name: 安装 Node 依赖
         run: pnpm install --frozen-lockfile
 
+      # CodeMirror 不入库，构建期从 npm 取（缺了 SSG 会直接报错）
+      - name: 取站点第三方静态资源（CodeMirror）
+        run: pnpm run vendor:codemirror
+
       - name: 运行性能基准并生成 JSON
         run: |
           pnpm run bench:release | tee benchmark.log

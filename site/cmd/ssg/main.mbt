@@ -26,6 +26,14 @@ async fn main {
   try @fs.write_file(output("demo.js"), demo) catch { _ => () }
 
   // 本地打包 CodeMirror 5（不依赖运行时 CDN）——复制到 out/codemirror/
+  //
+  // 这份资源不入库（构建期由 scripts/vendor-codemirror.mjs 从 npm 取），
+  // 而 copy_file 是容错的：缺了只会静默产出一个排版崩掉的页面。
+  // 所以先显式校验四个必需文件，缺一个就直接失败。
+  require_file("static/codemirror/lib/codemirror.js")
+  require_file("static/codemirror/lib/codemirror.css")
+  require_file("static/codemirror/mode/css/css.js")
+  require_file("static/codemirror/theme/dracula.css")
   copy_file("static/codemirror/lib/codemirror.js", output("codemirror/lib/codemirror.js"))
   copy_file("static/codemirror/lib/codemirror.css", output("codemirror/lib/codemirror.css"))
   copy_file("static/codemirror/mode/css/css.js", output("codemirror/mode/css/css.js"))
@@ -76,6 +84,26 @@ async fn copy_file(src : String, dst : String) -> Unit {
     let dir = dir_of(dst)
     try @fs.mkdir(dir, recursive = true) catch { _ => () }
     try @fs.write_file(dst, txt) catch { _ => () }
+  }
+}
+
+///| 必需静态资源的存在性校验：缺了就报错
+///
+/// `copy_file` 为容错设计（读不到就静默跳过），对「构建期生成、不入库」的
+/// 资源就成了静默失败点，所以这类文件先过一道 `require_file`。
+async fn require_file(path : String) -> Unit raise @core.CompileError {
+  let txt = try read_text(path) catch {
+    _ =>
+      raise @core.CompileError::EngineFailed(
+        engine="ssg",
+        message="缺少静态资源 " + path + "；先跑 `pnpm run vendor:codemirror`",
+      )
+  }
+  if txt.length() == 0 {
+    raise @core.CompileError::EngineFailed(
+      engine="ssg",
+      message="静态资源为空 " + path,
+    )
   }
 }
 
