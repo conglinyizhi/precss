@@ -1,0 +1,34 @@
+# mooncakes 打包排除清单
+#
+# 语义注意：moon 在同目录发现 `.moonignore` 后，**不再读 `.gitignore`**。所以这里
+# 必须把 `.gitignore` 里对打包有意义的条目抄全，只在末尾多一条针对本仓库的 `site/`。
+# 改 `.gitignore` 时记得同步这里（判据：moon package --list 的文件集对不对）。
+#
+# 为什么不直接把 `site/` 写进 `.gitignore`：gitignore 对已跟踪文件无效，但会让
+# site/ 下**新增**的文件被 `git add` 静默忽略 —— 那是更难查的失败模式。
+#
+# 为什么排 site/：它是独立演示站模块（自带 moon.mod / moon.work），随库发布没意义，
+# 包内未压缩 528 KB，比 backend/ + core/ + gen/ 三个加起来还大。
+
+# 构建 / 依赖产物（moon 另有内建排除，这里显式写清）
+_build/
+target/
+target
+.mooncakes/
+.moonagent/
+node_modules/
+
+# vendored sass-spec（差分用例源，不入库）
+test/sass-spec/
+
+# webruntime 构建产物（moon build 生成）
+example/webruntime/web.js
+example/webruntime/wasm-gc/web.wasm
+
+# 本地工作清单，不入库
+todo.md
+
+.DS_Store
+
+# 本条为本仓库额外排除：演示站不进包
+site/
