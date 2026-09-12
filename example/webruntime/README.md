@@ -12,15 +12,16 @@
 example/webruntime/
   web/            # #export_name 导出 compile_scss / compile_less（String→String）
     main.mbt
-  web.js          # build --target js 产物（ESM named export，开箱即用）
   runtime.js      # JS 版运行时：scan style[lang] → 调 compile_* → 替换
   index.html      # JS 版演示（scss / less / sass 三个 style[lang]）
   wasm-gc/
-    web.wasm      # build --target wasm-gc 产物（真 .wasm）
     runtime.js    # wasm-gc 运行时：instantiate + _start + scan
     index.html    # wasm-gc 版演示
   README.md
 ```
+
+> `web.js` / `wasm-gc/web.wasm` 是 **构建产物，不入库**，跑 demo 前先按下面对应
+> 章节 build 一次。产物已在 `.gitignore` 里，避免入库后与引擎源码脱节。
 
 ## JS backend 版（推荐，浏览器全覆盖）
 
@@ -47,9 +48,9 @@ String 直接是 JS string，零 ABI 握手）。
 构建：
 
 ```bash
-moon build --target wasm-gc example/webruntime/web
-# 产物: _build/wasm-gc/debug/build/example/webruntime/web/web.wasm
-cp _build/wasm-gc/debug/build/example/webruntime/web/web.wasm example/webruntime/wasm-gc/web.wasm
+moon build --target wasm-gc example/webruntime/wasm
+# 产物: _build/wasm-gc/debug/build/example/webruntime/wasm/wasm.wasm
+cp _build/wasm-gc/debug/build/example/webruntime/wasm/wasm.wasm example/webruntime/wasm-gc/web.wasm
 ```
 
 运行：

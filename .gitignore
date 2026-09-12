@@ -14,5 +14,9 @@ site/public/
 site/static/data/benchmark.json
 site/static/data/benchmark-lite.json
 
+# webruntime 构建产物（moon build 生成；部署与 site:dev 都现 build 现用）
+example/webruntime/web.js
+example/webruntime/wasm-gc/web.wasm
+
 # 本地工作清单，不入库
 todo.md
