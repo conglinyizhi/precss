@@ -137,18 +137,21 @@ fn emit_batch(cases : Array[String], compile : (String) -> String) -> Unit {
 }
 
 ///|
-/// 依内容特征判断糖种：sass(缩进) > scss($) > less(@) > scss
+/// 依内容特征判断糖种：sass(缩进) > scss > less，都不像则按 scss 处理
+///
+/// 走库里的 `Format::detect`。core 的 `looks_*` 比原先 CLI 自己那套
+/// `contains("$")` / `contains("@")` 精确：`@` 不再一律当 less，
+/// 只有真正的 LESS 变量定义（`@name:`）才算，`@media` / `@supports`
+/// 这类 at-rule 不会再把 scss 误判成 less。
+///
+/// `Format::detect` 对「没变量、也没控制指令」的裸嵌套规则判 `Css`，
+/// 而 `format` / `diagnose` 只认三种糖，这里落到 scss。
 fn detect_type(src : String) -> String {
-  if @scss.is_sass_indent(src) {
-    return "sass"
+  match @core.Format::detect(src) {
+    @core.Sass => "sass"
+    @core.Less => "less"
+    _ => "scss"
   }
-  if src.contains("$") {
-    return "scss"
-  }
-  if src.contains("@") {
-    return "less"
-  }
-  "scss"
 }
 
 ///|

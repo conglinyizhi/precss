@@ -189,11 +189,15 @@ echo 'a{color:red;font:bold}' | moon run cmd/cli -- format
 - **format**：minified → 规范 2 空格缩进源码；`--type <scss|sass|less>` / `--scss/--sass/--less` 强制类型（测探歧义时用）；`--css` 输出编译后 css。less 因无独立源码级 AST，暂转等价 scss 输出。
 - **diagnose**：检测同一规则内「同名同值」重复声明（`#.box: duplicate property "width: 16%"`）——LESS 会去重同类重复（保留最后一次），scss 保留但属无意义重复；用于提示用户手写可能预期不符。
 - **gen-types**：对应库里的 `generate_types`，从编译后的 CSS 里收集 class，生成每个 class 一个函数的 `.mbt` wrapper，供 rabbita 之类的 TS 式调用场景。
-- 管道**无扩展名**，`format`/`diagnose` 靠内容自动探测（缩进→sass、`$`→scss、`@`→less、都没有→scss）；含 `@media` 又无 `$` 的 scss 会被误判 less，用 `--type scss` 纠正。
+- 管道**无扩展名**，`format`/`diagnose` 靠内容自动探测，实现直接委托库里的 `Format::detect`（缩进→sass、有 SCSS 变量/控制指令→scss、有 LESS 变量定义 `@name:`→less、都没有→scss）。
 
 > CLI 的探测默认落到 scss（它的输入就是待格式化的样式源码），
 > 而库的 `Format::detect` 默认落到 CSS（透传）——两者对“既无变量也无缩进”
 > 的输入取值不同，这是有意为之：CLI 拿它当糖种选解析器，库拿它当“不需要编译”。
+>
+> 探测已不再用 `contains("$")` / `contains("@")` 那种粗筛，所以
+> **`@media` / `@supports` 这类 at-rule 不会再被误判成 less**（只有真正的
+> LESS 变量定义 `@name:` 才算）。仍然歧义时用 `--type` 强制。
 
 ## 性能基准（随机结构压测）
 

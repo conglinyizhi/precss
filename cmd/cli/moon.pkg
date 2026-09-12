@@ -1,5 +1,6 @@
 import {
   "conglinyizhi/precss" @mb,
+  "conglinyizhi/precss/core",
   "conglinyizhi/precss/backend/scss",
   "conglinyizhi/precss/backend/less",
   "moonbitlang/core/env",
