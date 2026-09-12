@@ -3,6 +3,7 @@ import {
   "conglinyizhi/precss/backend/css",
   "conglinyizhi/precss/backend/scss",
   "conglinyizhi/precss/backend/less",
+  "conglinyizhi/precss/gen",
 }
 
 import {
