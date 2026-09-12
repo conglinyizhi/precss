@@ -926,7 +926,7 @@ fn resolve(toks : Array[String], env : Env) -> String raise @core.CompileError {
   }
   // 普通 CSS 值不需要变量、插值或表达式处理，跳过中间数组与算术折叠。
   if can_fast_resolve(toks) {
-    return join_value_tokens(toks)
+    return join_value_tokens(toks, [])
   }
   let parts : Array[String] = []
   for t in toks {
@@ -946,7 +946,9 @@ fn resolve(toks : Array[String], env : Env) -> String raise @core.CompileError {
       parts.push(t)
     }
   }
-  join_value_tokens(fold_arith(strip_parens(parts)))
+  let stripped = strip_parens(parts)
+  let folded = fold_arith(stripped)
+  join_value_tokens(folded, math_group_mask(folded))
 }
 
 ///|
@@ -1001,13 +1003,23 @@ fn is_ident_ish(s : String) -> Bool {
 
 ///|
 /// 值 token 序列化：运算符 / 括号 / 逗号 / 冒号按 CSS 习惯紧贴相邻 token
-fn join_value_tokens(parts : Array[String]) -> String raise @core.CompileError {
+///
+/// `mask` 标出每个 token 是否落在 `calc()`/`min()`/`max()`/`clamp()` 组内，
+/// 组内是 CSS Calculation 语义，运算符两侧必须有空白。
+fn join_value_tokens(
+  parts : Array[String],
+  mask : Array[Bool],
+) -> String raise @core.CompileError {
   let sb = StringBuilder()
   for i, t in parts {
-    if t == "+" {
+    let in_math = mask_at(mask, i) || mask_at(mask, i - 1)
+    if t == "+" && !in_math {
       // 字符串连接：去除 +，且让前后 token 紧密（c + d -> cd）。
       // 但 `+` 必须有右操作数——`width: 1px + ;` 这种残缺表达式以前会把
       // `+` 静静丢掉，产出一个看起来正常的声明，没有任何报错。
+      //
+      // 数学函数组内不走这条路：calc(a + b) 里的 `+` 是加法，
+      // 当连接符吃掉会变成 calc(ab)。
       if i + 1 >= parts.length() {
         raise @core.CompileError::EngineFailed(
           engine="scss",
@@ -1016,7 +1028,7 @@ fn join_value_tokens(parts : Array[String]) -> String raise @core.CompileError {
       }
       continue
     }
-    if i > 0 && value_needs_space(parts[i - 1], t) {
+    if i > 0 && value_needs_space(parts, i, in_math) {
       sb.write_string(" ")
     }
     sb.write_string(t)
@@ -1025,13 +1037,26 @@ fn join_value_tokens(parts : Array[String]) -> String raise @core.CompileError {
 }
 
 ///|
-/// 相邻两个值 token 之间是否需要空格
+/// 相邻两个值 token 之间是否需要空格（`i` 为当前 token 下标，i > 0）
 ///
 /// `,` `:` `)` 与运算符、左括号都紧贴前一个 token；
 /// 左括号、运算符之后的 token 也紧贴——`var(--o, rgba(0, 0, 0, .2))`
 /// 以前会被插成 `var(--o , rgba(0 , 0 , 0 , 0.2))`，`:has()` / `@supports`
 /// 的 `:` 同理。
-fn value_needs_space(prev : String, cur : String) -> Bool {
+///
+/// `calc()` 这类数学函数是例外：CSS 规定组内二元运算符两侧必须有空白，
+/// 写成 `calc(100%-10px)` 浏览器会整条丢弃；一元符号（`-2px`）不空格。
+fn value_needs_space(parts : Array[String], i : Int, in_math : Bool) -> Bool {
+  let prev = parts[i - 1]
+  let cur = parts[i]
+  if in_math {
+    if is_op(cur) {
+      return !is_unary_op_at(parts, i)
+    }
+    if is_op(prev) {
+      return !is_unary_op_at(parts, i - 1)
+    }
+  }
   if is_op(cur) || is_paren(cur) || cur == "," || cur == ":" {
     return false
   }
@@ -1039,6 +1064,76 @@ fn value_needs_space(prev : String, cur : String) -> Bool {
     return false
   }
   true
+}
+
+///|
+/// `parts[i]` 是否是一元运算符（前面是 `(` `,` 或另一个运算符）
+fn is_unary_op_at(parts : Array[String], i : Int) -> Bool {
+  if i <= 0 {
+    return true
+  }
+  let p = parts[i - 1]
+  p == "(" || p == "," || is_op(p)
+}
+
+///|
+/// 是否 CSS 数学函数：内部是 Calculation 语义，不能按普通值折叠
+fn is_math_fn(s : String) -> Bool {
+  s == "calc" ||
+  s == "min" ||
+  s == "max" ||
+  s == "clamp" ||
+  s.has_suffix("-calc")
+}
+
+///|
+/// 标出每个 token 是否落在数学函数组内（无括号时返回空数组，省一次分配）
+fn math_group_mask(parts : Array[String]) -> Array[Bool] {
+  let mask : Array[Bool] = []
+  let stack : Array[Bool] = []
+  let mut has_paren = false
+  for t in parts {
+    if t == "(" {
+      has_paren = true
+      break
+    }
+  }
+  if !has_paren {
+    return mask
+  }
+  for i, t in parts {
+    let in_group = stack_has_true(stack)
+    if t == "(" {
+      let is_math = i > 0 && is_math_fn(parts[i - 1])
+      mask.push(in_group || is_math)
+      stack.push(is_math)
+    } else if t == ")" {
+      mask.push(in_group)
+      if stack.length() > 0 {
+        ignore(stack.pop())
+      }
+    } else {
+      mask.push(in_group)
+    }
+  }
+  mask
+}
+
+///|
+/// 栈上是否存在处于数学函数组内的层级
+fn stack_has_true(stack : Array[Bool]) -> Bool {
+  for b in stack {
+    if b {
+      return true
+    }
+  }
+  false
+}
+
+///|
+/// 越界的 mask 一律按 false（无括号时 mask 为空）
+fn mask_at(mask : Array[Bool], i : Int) -> Bool {
+  i >= 0 && i < mask.length() && mask[i]
 }
 
 ///|
@@ -1080,11 +1175,17 @@ fn join_nested(parent : String, sel : String) -> String {
 
 ///|
 /// 对值 token 做简单的数字加减折叠（`8px + 4px` -> `12px`）
+///
+/// 数学函数组内（`calc()`/`min()`/`max()`/`clamp()`）一律不折叠：
+/// 那里是 CSS Calculation，`calc(100% - 10px)` 折叠成 `calc(90%)` 会改语义，
+/// 而且是静默的。完整对齐 dart-sass 需要带单位 + 浮点的值模型，另议。
 fn fold_arith(parts : Array[String]) -> Array[String] {
+  let mask = math_group_mask(parts)
   let out : Array[String] = []
   let mut i = 0
   while i < parts.length() {
-    if i + 2 < parts.length() &&
+    if !mask_at(mask, i) &&
+      i + 2 < parts.length() &&
       is_num_str(parts[i]) &&
       (parts[i + 1] == "+" || parts[i + 1] == "-" || parts[i + 1] == "*") &&
       is_num_str(parts[i + 2]) {

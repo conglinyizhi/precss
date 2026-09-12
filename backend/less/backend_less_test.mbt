@@ -360,3 +360,32 @@ test "function value keeps tight" {
     ),
   )
 }
+
+///|
+/// 回归：LESS 的 `merge_math` 同样不能折 `calc()` 里的算术
+test "calc keeps its own arithmetic" {
+  inspect(
+    compile_less(
+      ".a { b: calc(100% - 10px); }\n.b { c: calc(var(--x) + 2px); }\n.c { d: calc(-2px + var(--x)); }\n.d { e: calc((var(--x) + 2px)/3); }",
+    ),
+    content=(
+      #|.a {
+      #|  b: calc(100% - 10px);
+      #|}
+      #|
+      #|.b {
+      #|  c: calc(var(--x) + 2px);
+      #|}
+      #|
+      #|.c {
+      #|  d: calc(-2px + var(--x));
+      #|}
+      #|
+      #|.d {
+      #|  e: calc((var(--x) + 2px) / 3);
+      #|}
+      #|
+      #|
+    ),
+  )
+}

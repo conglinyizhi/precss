@@ -252,3 +252,48 @@ test "negative token in space separated shorthand" {
     ),
   )
 }
+
+///|
+/// 回归：`calc()` 里是 CSS Calculation，不能被当普通算术折掉，
+/// 运算符两侧也不能被压掉——`calc(100% - 10px)` 折成 `calc(90%)` 会静默改语义，
+/// `calc(100%-10px)` 浏览器会整条丢弃。
+test "calc keeps its own arithmetic" {
+  inspect(
+    compile(
+      ".a { b: calc(100% - 10px); }\n.b { c: calc(var(--x) + 2px); }\n.c { d: calc(-2px + var(--x)); }\n.d { e: calc((var(--x) + 2px)/3); }\n.e { f: min(1px + 2px, var(--x)); }",
+    ),
+    content=(
+      #|.a {
+      #|  b: calc(100% - 10px);
+      #|}
+      #|.b {
+      #|  c: calc(var(--x) + 2px);
+      #|}
+      #|.c {
+      #|  d: calc(-2px + var(--x));
+      #|}
+      #|.d {
+      #|  e: calc((var(--x) + 2px) / 3);
+      #|}
+      #|.e {
+      #|  f: min(1px + 2px, var(--x));
+      #|}
+      #|
+    ),
+  )
+}
+
+///|
+/// calc 组外仍照旧折叠，别被上面的保护误伤
+test "arith outside calc still folds" {
+  inspect(
+    compile(".a { b: 8px + 4px; c: calc(1px + 2px); }"),
+    content=(
+      #|.a {
+      #|  b: 12px;
+      #|  c: calc(1px + 2px);
+      #|}
+      #|
+    ),
+  )
+}

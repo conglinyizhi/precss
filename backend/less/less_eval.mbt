@@ -453,34 +453,59 @@ fn resolve_at(t : String, env : Env) -> String raise @core.CompileError {
 /// 否则 `rgba(0, 0, 0, .2)` 会变成 `rgba ( 0 , 0 , 0 , .2 )`——这是无效 CSS，
 /// 浏览器会整条声明丢弃。
 fn merge_math(toks : Array[String]) -> String {
+  let folded = fold_math(toks)
+  let mask = math_group_mask(folded)
   let sb = StringBuilder()
-  let mut i = 0
-  while i < toks.length() {
-    let t = toks[i]
-    if is_number(t) &&
-      i + 2 < toks.length() &&
-      is_operator(toks[i + 1]) &&
-      is_number(toks[i + 2]) {
-      let r = num_arith(t, toks[i + 1], toks[i + 2])
-      if i > 0 && value_needs_space(toks[i - 1], r) {
-        sb.write_string(" ")
-      }
-      sb.write_string(r)
-      i += 3
-    } else {
-      if i > 0 && value_needs_space(toks[i - 1], t) {
-        sb.write_string(" ")
-      }
-      sb.write_string(t)
-      i += 1
+  for i, t in folded {
+    let in_math = mask_at(mask, i) || mask_at(mask, i - 1)
+    if i > 0 && value_needs_space(folded, i, in_math) {
+      sb.write_string(" ")
     }
+    sb.write_string(t)
   }
   sb.to_string()
 }
 
 ///|
-/// 相邻两个值 token 之间是否需要空格
-fn value_needs_space(prev : String, cur : String) -> Bool {
+/// 折叠 `num op num`。数学函数组内（`calc()`/`min()`/`max()`/`clamp()`）
+/// 一律不折叠：那是 CSS Calculation，`calc(100% - 10px)` 折成 `calc(90%)`
+/// 会静默改语义
+fn fold_math(toks : Array[String]) -> Array[String] {
+  let mask = math_group_mask(toks)
+  let out : Array[String] = []
+  let mut i = 0
+  while i < toks.length() {
+    if !mask_at(mask, i) &&
+      is_number(toks[i]) &&
+      i + 2 < toks.length() &&
+      is_operator(toks[i + 1]) &&
+      is_number(toks[i + 2]) {
+      out.push(num_arith(toks[i], toks[i + 1], toks[i + 2]))
+      i += 3
+    } else {
+      out.push(toks[i])
+      i += 1
+    }
+  }
+  out
+}
+
+///|
+/// 相邻两个值 token 之间是否需要空格（`i` 为当前 token 下标，i > 0）
+///
+/// 数学函数组内二元运算符两侧必须有空白，写成 `calc(100%-10px)` 浏览器会
+/// 整条丢弃；一元符号（`-2px`）不空格。
+fn value_needs_space(parts : Array[String], i : Int, in_math : Bool) -> Bool {
+  let prev = parts[i - 1]
+  let cur = parts[i]
+  if in_math {
+    if is_operator(cur) {
+      return !is_unary_op_at(parts, i)
+    }
+    if is_operator(prev) {
+      return !is_unary_op_at(parts, i - 1)
+    }
+  }
   if is_operator(cur) || cur == "(" || cur == ")" || cur == "," || cur == ":" {
     return false
   }
@@ -488,6 +513,76 @@ fn value_needs_space(prev : String, cur : String) -> Bool {
     return false
   }
   true
+}
+
+///|
+/// `parts[i]` 是否是一元运算符（前面是 `(` `,` 或另一个运算符）
+fn is_unary_op_at(parts : Array[String], i : Int) -> Bool {
+  if i <= 0 {
+    return true
+  }
+  let p = parts[i - 1]
+  p == "(" || p == "," || is_operator(p)
+}
+
+///|
+/// 是否 CSS 数学函数：内部是 Calculation 语义，不能按普通值折叠
+fn is_math_fn(s : String) -> Bool {
+  s == "calc" ||
+  s == "min" ||
+  s == "max" ||
+  s == "clamp" ||
+  s.has_suffix("-calc")
+}
+
+///|
+/// 标出每个 token 是否落在数学函数组内（无括号时返回空数组）
+fn math_group_mask(parts : Array[String]) -> Array[Bool] {
+  let mask : Array[Bool] = []
+  let stack : Array[Bool] = []
+  let mut has_paren = false
+  for t in parts {
+    if t == "(" {
+      has_paren = true
+      break
+    }
+  }
+  if !has_paren {
+    return mask
+  }
+  for i, t in parts {
+    let in_group = stack_has_true(stack)
+    if t == "(" {
+      let is_math = i > 0 && is_math_fn(parts[i - 1])
+      mask.push(in_group || is_math)
+      stack.push(is_math)
+    } else if t == ")" {
+      mask.push(in_group)
+      if stack.length() > 0 {
+        ignore(stack.pop())
+      }
+    } else {
+      mask.push(in_group)
+    }
+  }
+  mask
+}
+
+///|
+/// 栈上是否存在处于数学函数组内的层级
+fn stack_has_true(stack : Array[Bool]) -> Bool {
+  for b in stack {
+    if b {
+      return true
+    }
+  }
+  false
+}
+
+///|
+/// 越界的 mask 一律按 false（无括号时 mask 为空）
+fn mask_at(mask : Array[Bool], i : Int) -> Bool {
+  i >= 0 && i < mask.length() && mask[i]
 }
 
 ///|
