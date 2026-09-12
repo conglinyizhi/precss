@@ -222,7 +222,7 @@ node scripts/diff.mjs test/sass-spec/spec/variables
 node scripts/less_diff.mjs                       # less 自带 cases
 ```
 
-差分报告见 `test/spec-gap.md`（通过率、已支持特性、归档的 deep-water）。
+差分报告见 `docs/spec-gap.md`（通过率、已支持特性、归档的 deep-water）。
 
 ## Compiler 全栈嵌合指南
 
