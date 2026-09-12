@@ -1644,8 +1644,18 @@ fn is_cmp(t : String) -> Bool {
 
 ///|
 /// 把字符串切成 token（用于变量值再求值）
+///
+/// `tokenize` 会保留空白 token（选择器语义），但这里是表达式/值求值，
+/// 空白一律由 `join_value_tokens` 按 token 类别重新生成，所以先剔除；
+/// 留着会把 `1px + 2px` 变成 `1px 空格 + 空格 2px`，算术折叠直接失配。
 fn tokenize_str(s : String) -> Array[String] {
-  tokenize(s)
+  let out : Array[String] = []
+  for t in tokenize(s) {
+    if t != " " {
+      out.push(t)
+    }
+  }
+  out
 }
 
 ///|

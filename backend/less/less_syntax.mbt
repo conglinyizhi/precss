@@ -49,7 +49,15 @@ fn LessParser::new(toks : Array[String]) -> LessParser {
 }
 
 ///|
+/// 当前 token，跳过空白（无则 None）
+///
+/// 跳过循环写在这里而不是折成函数：`peek` / `advance` 是解析阶段最热的两个
+/// 调用，多一层函数调用会把热路径磨慢。需要原样保留空白的只有选择器头
+/// （`read_head` 直接读 `toks`）。
 fn LessParser::peek(self : LessParser) -> String? {
+  while self.pos < self.toks.length() && self.toks[self.pos] == " " {
+    self.pos += 1
+  }
   if self.pos < self.toks.length() {
     Some(self.toks[self.pos])
   } else {
@@ -59,6 +67,9 @@ fn LessParser::peek(self : LessParser) -> String? {
 
 ///|
 fn LessParser::advance(self : LessParser) -> String {
+  while self.pos < self.toks.length() && self.toks[self.pos] == " " {
+    self.pos += 1
+  }
   let t = self.toks[self.pos]
   self.pos += 1
   t
@@ -122,7 +133,7 @@ fn LessParser::parse_one(
 fn LessParser::parse_var(self : LessParser) -> LessNode {
   let name = strip_at(self.advance())
   self.consume(":")
-  let value = self.read_head()
+  let value = strip_ws(self.read_head())
   self.consume(";")
   VarDef(name, value)
 }
@@ -181,6 +192,9 @@ fn LessParser::parse_mixin(
 
 ///|
 /// 声明或嵌套规则
+///
+/// head 用原始 token 收集（含空白 token）：选择器需要它，声明不需要。
+/// 到 `{` 才知道是规则集，所以先原样收着，落成声明时再过滤。
 fn LessParser::parse_decl_or_rule(
   self : LessParser,
 ) -> LessNode? raise @core.CompileError {
@@ -202,18 +216,68 @@ fn LessParser::parse_decl_or_rule(
 
 ///|
 /// 读到 `{` / `;` / `}` / EOF（`:` 不截断，避免把 `&:hover` 当声明）
+///
+/// 空白 token 原样保留：返回的 head 既可能是选择器也可能是声明，
+/// 前者需要空白来区分复合/后代，后者由调用方按需过滤。
 fn LessParser::read_head(self : LessParser) -> Array[String] {
+  while self.pos < self.toks.length() && self.toks[self.pos] == " " {
+    self.pos += 1
+  }
   let out : Array[String] = []
   while true {
-    match self.peek() {
-      None => break
-      Some("}") => break
-      Some(";") => break
-      Some("{") => break
-      Some(t) => {
-        out.push(t)
-        self.pos += 1
-      }
+    if self.pos >= self.toks.length() {
+      break
+    }
+    let t = self.toks[self.pos]
+    if t == "}" || t == ";" || t == "{" {
+      break
+    }
+    out.push(t)
+    self.pos += 1
+  }
+  // 首尾空白对选择器与声明都无意义（`single_class_name([".m"])` 靠这个成立），
+  // 内部空白要留着
+  trim_ws(out)
+}
+
+///|
+/// 去掉 token 流首尾的空白 token
+///
+/// 无空白可去时直接返回原数组（分词阶段已把结构符旁的空白省掉，这是常态）。
+fn trim_ws(toks : Array[String]) -> Array[String] {
+  let n = toks.length()
+  if n == 0 || (toks[0] != " " && toks[n - 1] != " ") {
+    return toks
+  }
+  let mut start = 0
+  let mut end = n
+  while start < end && toks[start] == " " {
+    start += 1
+  }
+  while end > start && toks[end - 1] == " " {
+    end -= 1
+  }
+  toks[start:end].to_owned()
+}
+
+///|
+/// token 流里是否夹着空白 token
+fn has_ws(toks : Array[String]) -> Bool {
+  for t in toks {
+    if t == " " {
+      return true
+    }
+  }
+  false
+}
+
+///|
+/// 去掉 token 流里的空白 token（声明的属性名 / 值不需要空白信息）
+fn strip_ws(toks : Array[String]) -> Array[String] {
+  let out : Array[String] = []
+  for t in toks {
+    if t != " " {
+      out.push(t)
     }
   }
   out
@@ -226,17 +290,20 @@ fn LessParser::make_decl_or_raw(
   head : Array[String],
 ) -> LessNode {
   ignore(self)
-  let colon = find_colon_in_tokens(head)
+  // 声明里通常没有空白 token（分词阶段已把结构符旁的空白省掉），
+  // 这时直接用 head，不做拷贝
+  let toks = if has_ws(head) { strip_ws(head) } else { head }
+  let colon = find_colon_in_tokens(toks)
   if colon > 0 {
-    let prop = head[0:colon].join(" ")
-    let val = head[colon + 1:].to_owned()
+    let prop = toks[0:colon].join(" ")
+    let val = toks[colon + 1:].to_owned()
     Decl(prop, val)
   } else {
     // 块内单独一个类名、又没有分号结尾（`.a { .m }`）：LESS 里这是无参
     // mixin 调用。之前落成 Raw，而求值侧对 Raw 直接丢弃，整个块就没了。
-    match single_class_name(head) {
+    match single_class_name(toks) {
       Some(name) => MixinCall(name, [])
-      None => Raw(head.join(" "))
+      None => Raw(toks.join(" "))
     }
   }
 }
@@ -313,7 +380,7 @@ fn LessParser::read_paren_list(self : LessParser) -> Array[String] {
         cur.write_string(t)
         self.pos += 1
         // 项内给 token 之间补空格，保证原样可读
-        if self.peek() is Some(_) && self.toks[self.pos - 1] != "(" {
+        if self.peek() is Some(_) && t != "(" {
           cur.write_string(" ")
         }
       }
@@ -323,14 +390,21 @@ fn LessParser::read_paren_list(self : LessParser) -> Array[String] {
 }
 
 ///|
-/// 输出当前 pos 后偏移处的 token
+/// 输出当前 pos 起第 off 个**非空白** token
 fn LessParser::peek_at(self : LessParser, off : Int) -> String? {
-  let k = self.pos + off
-  if k < self.toks.length() {
-    Some(self.toks[k])
-  } else {
-    None
+  let mut k = self.pos
+  let mut seen = 0
+  while k < self.toks.length() {
+    let t = self.toks[k]
+    if t != " " {
+      if seen == off {
+        return Some(t)
+      }
+      seen += 1
+    }
+    k += 1
   }
+  None
 }
 
 ///|

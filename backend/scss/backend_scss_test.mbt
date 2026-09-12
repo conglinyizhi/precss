@@ -200,7 +200,7 @@ test "mixin string param interpolation into selector" {
       "@mixin interactive($name) {\n  .#{$name}:hover > .#{$name}__overlay { opacity: .5; }\n}\n@include interactive(\"v-btn\");",
     ),
     content=(
-      #|.v-btn:hover>.v-btn__overlay {
+      #|.v-btn:hover > .v-btn__overlay {
       #|  opacity: .5;
       #|}
       #|
@@ -222,7 +222,7 @@ test "functional parens keep tight" {
       #|.a:has(input:checked) .b {
       #|  display: inline-flex;
       #|}
-      #|.v-btn:not(.v-btn--disabled):hover>.v-btn__overlay {
+      #|.v-btn:not(.v-btn--disabled):hover > .v-btn__overlay {
       #|  opacity: .12;
       #|}
       #|@supports (display: grid) {
@@ -292,6 +292,89 @@ test "arith outside calc still folds" {
       #|.a {
       #|  b: 12px;
       #|  c: calc(1px + 2px);
+      #|}
+      #|
+    ),
+  )
+}
+
+///|
+/// 回归（issue #2）：函数式伪类后面紧跟另一个简单选择器时不能被插空格。
+///
+/// 以前 `:not(.b).c` → `:not(.b) .c`，同一个元素上的复合选择器变成了后代
+/// 选择器，规则完全不匹配任何元素，而且全程无报错。同一类错位也见于 `:has()`。
+test "K: functional pseudo keeps tight to following simple selector" {
+  inspect(
+    compile(
+      ".a:not(.b).c input { position: absolute; }\n.a:not(.b):hover { opacity: 1; }\n.d:has(input:checked).e { color: red; }",
+    ),
+    content=(
+      #|.a:not(.b).c input {
+      #|  position: absolute;
+      #|}
+      #|.a:not(.b):hover {
+      #|  opacity: 1;
+      #|}
+      #|.d:has(input:checked).e {
+      #|  color: red;
+      #|}
+      #|
+    ),
+  )
+}
+
+///|
+/// 回归（issue #2 的反例）：作者写的后代选择器不能被粘成复合选择器。
+///
+/// `.a:not(.b) .c` 与 `.a:not(.b).c` 只差一个空白。以前空白在分词阶段就丢了，
+/// 只能靠字符启发式猜；给 `)` 打补丁会把这条真的后代选择器反过来粘死。
+/// 现在空白进 token 流，两种写法各归各位。
+test "K2: descendant after functional pseudo keeps space" {
+  inspect(
+    compile(
+      ".x:not(.y) .z { a: 1; }\n.x:not(.y):hover { a: 2; }\n.x:not(.y)>b { a: 3; }\n.a:not(.b) .c input { b: 1; }",
+    ),
+    content=(
+      #|.x:not(.y) .z {
+      #|  a: 1;
+      #|}
+      #|.x:not(.y):hover {
+      #|  a: 2;
+      #|}
+      #|.x:not(.y)>b {
+      #|  a: 3;
+      #|}
+      #|.a:not(.b) .c input {
+      #|  b: 1;
+      #|}
+      #|
+    ),
+  )
+}
+
+///|
+/// 回归（issue #2）：空白在 token 流里还原，选择器其余形态不能被改动。
+/// 多空格归并成一个、逗号前后收干净、标识符里的插值不开缝。
+///
+/// 顺带护住一个同类静默错误：属性选择器的运算符（`[lang|=en]`）以前会被
+/// 插成 `[lang | = en]`——那是无效 CSS，整条丢弃。
+test "selector whitespace normalization" {
+  inspect(
+    compile(
+      ".a   .b , .c\t.d { a: 1; }\n.e:not( .f ) .g { b: 2; }\n.h[lang|=en].i { c: 3; }\n.j[data-x=\"a b\"] .k { d: 4; }",
+    ),
+    content=(
+      #|.a .b, .c .d {
+      #|  a: 1;
+      #|}
+      #|.e:not(.f) .g {
+      #|  b: 2;
+      #|}
+      #|.h[lang|=en].i {
+      #|  c: 3;
+      #|}
+      #|.j[data-x="a b"] .k {
+      #|  d: 4;
       #|}
       #|
     ),

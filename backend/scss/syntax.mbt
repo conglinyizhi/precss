@@ -41,7 +41,14 @@ pub extend Node with @debug.Debug::{to_repr}
 /// SCSS 词法：把源码切成 token 序列
 ///
 /// token 以裸字符串表示（`$var`、`@mixin`、`1px`、`red`、`{`、`:`……），
-/// 便于上层 parser 直接用字符串字面匹配。注释与空白被丢弃。
+/// 便于上层 parser 直接用字符串字面匹配。注释被丢弃。
+///
+/// 连续空白归并成一个 `" "` token 保留在流里（前后紧跟结构符的除外，
+/// 见 `ws_irrelevant_prev` / `ws_irrelevant_next`），而不是丢掉：选择器里
+/// `.a.b`（复合）与 `.a .b`（后代）的差别只存在于空白，丢了之后只能靠
+/// 字符启发式猜，猜错就是把复合选择器变成后代选择器——整条规则静默失效。
+/// 语法结构不关心空白，parser 的 `peek` / `advance` 会自动跳过它；
+/// 只有选择器拼接（`join_selector` / LESS 的 `join_selector_tokens`）用它。
 pub fn tokenize(src : String) -> Array[String] {
   let toks : Array[String] = []
   let n = src.length()
@@ -49,7 +56,21 @@ pub fn tokenize(src : String) -> Array[String] {
   while i < n {
     let c = src[i]
     if is_ws(c) {
-      i += 1
+      while i < n && is_ws(src[i]) {
+        i += 1
+      }
+      // 空白 token 只在「两个选择器 token 之间」有语义（区分复合与后代）。
+      // 这几个位置前后都不会影响选择器，不产出 token；排版好的源码里
+      // 绝大多数空白都在这里，省掉它们 token 流才基本维持原大小。
+      let prev_tok = if toks.length() > 0 {
+        toks[toks.length() - 1]
+      } else {
+        ""
+      }
+      let next_ok = i < n && !ws_irrelevant_next(src[i])
+      if !ws_irrelevant_prev(prev_tok) && next_ok {
+        toks.push(" ")
+      }
       continue
     }
     // 注释
@@ -199,6 +220,34 @@ fn is_ws(u : UInt16) -> Bool {
 }
 
 ///|
+/// 紧跟在后面出现的空白是否没有语义（不需要产出空白 token）
+///
+/// 这些字符后面一定是新 token 的开头，而空白 token 唯一的作用是区分选择器里
+/// 的「复合 / 后代」（`.a.b` 与 `.a .b`）：
+///
+/// - `{` `}` `;` 后面是语法结构的位置，parser 的 `peek` / `advance` 会跳过；
+/// - `:` `,` 后面不可能是同一个复合选择器里的下一个简单选择器（`: hover`、
+///   `, .b` 都不是合法写法），选择器拼接与声明值都在边界处修掉它。
+///
+/// 其余位置（token 之间）的空白必须留下。
+fn ws_irrelevant_prev(prev : String) -> Bool {
+  if prev.length() == 0 {
+    return true
+  }
+  let p = prev[prev.length() - 1]
+  p == '{' || p == '}' || p == ';' || p == ':' || p == ','
+}
+
+///|
+/// 紧跟在空白后面的这些字符同样让空白失去意义
+///
+/// `{` `}` `;` `,` `)` 前不可能需要一个空白来区分复合/后代；
+/// 注意 `.` `#` `:` 不在内——`.a .b`、`.a :hover` 里的空白是有语义的。
+fn ws_irrelevant_next(c : UInt16) -> Bool {
+  c == '{' || c == '}' || c == ';' || c == ',' || c == ')'
+}
+
+///|
 /// 是否为十进制数字
 fn is_digit(u : UInt16) -> Bool {
   u >= '0' && u <= '9'
@@ -249,8 +298,14 @@ fn Parser::new(toks : Array[String]) -> Parser {
 }
 
 ///|
-/// 当前 token（无则 None）
+/// 当前 token，跳过空白（无则 None）
+///
+/// 跳过循环写在这里而不是折成函数：`peek` / `advance` 是解析阶段最热的两个
+/// 调用，多一层函数调用会把热路径磨慢。
 fn Parser::peek(self : Parser) -> String? {
+  while self.pos < self.toks.length() && self.toks[self.pos] == " " {
+    self.pos += 1
+  }
   if self.pos < self.toks.length() {
     Some(self.toks[self.pos])
   } else {
@@ -259,8 +314,11 @@ fn Parser::peek(self : Parser) -> String? {
 }
 
 ///|
-/// 取走当前 token
+/// 取走当前 token，跳过空白
 fn Parser::advance(self : Parser) -> String {
+  while self.pos < self.toks.length() && self.toks[self.pos] == " " {
+    self.pos += 1
+  }
   let t = self.toks[self.pos]
   self.pos += 1
   t
@@ -493,31 +551,41 @@ fn Parser::read_params(self : Parser) -> Array[String] {
 
 ///|
 /// 声明或规则集
+///
+/// head 用原始 token 收集（含空白 token）：选择器需要它，声明不需要。
+/// 到 `{` 才知道是规则集，所以先原样收着，落成声明时再 `strip_ws`。
 fn Parser::parse_decl_or_rule(self : Parser) -> Node? raise @core.CompileError {
+  while self.pos < self.toks.length() && self.toks[self.pos] == " " {
+    self.pos += 1
+  }
   let head : Array[String] = []
   while true {
-    match self.peek() {
-      None => break
-      Some("{") => {
-        self.pos += 1
-        let selectors = split_selectors(head)
-        let body = self.parse_block()
-        self.expect("}")
-        return Some(RuleSet(selectors, body))
-      }
-      Some(";") => {
-        self.pos += 1
-        return parse_decl(head)
-      }
-      Some("}") => break
-      Some(_) => head.push(self.advance())
+    if self.pos >= self.toks.length() {
+      break
     }
+    let t = self.toks[self.pos]
+    if t == "{" {
+      self.pos += 1
+      let selectors = split_selectors(head)
+      let body = self.parse_block()
+      self.expect("}")
+      return Some(RuleSet(selectors, body))
+    }
+    if t == ";" {
+      self.pos += 1
+      return parse_decl(head)
+    }
+    if t == "}" {
+      break
+    }
+    head.push(t)
+    self.pos += 1
   }
   // 块结尾（} 或 EOF）：若形如 `name: value` 则按声明处理（SCSS 允许末尾声明省略分号）
   if has_colon(head) {
     return parse_decl(head)
   }
-  Some(Raw(head.join(" ")))
+  Some(Raw(strip_ws(head).join(" ")))
 }
 
 ///|
@@ -533,6 +601,10 @@ fn has_colon(head : Array[String]) -> Bool {
 
 ///|
 /// 从 `name : value` 头解析声明
+///
+/// 空白 token 是选择器语义的产物，声明不要它，但每次都 `strip_ws` 一下会
+/// 给每条声明多两次分配。这里先扫一遍：整段没夹空白 token 就直接切片
+/// （与加空白 token 之前的开销一致），夹了才走过滤。
 fn parse_decl(head : Array[String]) -> Node? {
   let mut colon = -1
   let mut i = 0
@@ -545,11 +617,47 @@ fn parse_decl(head : Array[String]) -> Node? {
   }
   if colon < 0 {
     // 没有冒号，无法当作声明；透传
-    return Some(Raw(head.join(" ")))
+    return Some(Raw(strip_ws(head).join(" ")))
   }
-  let name = head[0:colon].join("")
-  let value = head[colon + 1:].to_owned()
+  let name = if has_ws(head, 0, colon) {
+    strip_ws(head[0:colon].to_owned()).join("")
+  } else {
+    head[0:colon].join("")
+  }
+  let value = if has_ws(head, colon + 1, head.length()) {
+    strip_ws(head[colon + 1:].to_owned())
+  } else {
+    head[colon + 1:].to_owned()
+  }
   Some(Decl(name, value))
+}
+
+///|
+/// `[from, to)` 区间内是否夹着空白 token
+fn has_ws(toks : Array[String], from : Int, to : Int) -> Bool {
+  let mut i = from
+  while i < to {
+    if toks[i] == " " {
+      return true
+    }
+    i += 1
+  }
+  false
+}
+
+///|
+/// 剔除 token 流里的空白 token
+///
+/// 值与声明名由上层统一用空格拼接（`resolve` / `decl_line`），空白 token
+/// 混进去只会变成双空格。
+fn strip_ws(toks : Array[String]) -> Array[String] {
+  let out : Array[String] = []
+  for t in toks {
+    if t != " " {
+      out.push(t)
+    }
+  }
+  out
 }
 
 ///|
@@ -643,66 +751,31 @@ fn split_selectors(tokens : Array[String]) -> Array[String] {
 }
 
 ///|
-/// 把选择器 token join 成字符串，连接符前不加空格
+/// 把选择器 token join 成字符串
+///
+/// 空白完全按 token 流原样还原：有空白 token 的地方才出空格。不再用
+/// 「前一个 token 以 `.` `:` `(`…… 结尾就不加空格」那套字符启发式——
+/// 启发式分不清 `.a:not(.b).c` 和 `.a:not(.b) .c`，见 issue #2。
 fn join_selector(tokens : Array[String]) -> String {
   let sb = StringBuilder()
+  // 上一个已写出的 token（"" 表示还没写任何东西）
   let mut prev = ""
-  let mut first = true
+  // 待写的空白：只有后面真的跟着 token 才落下来，尾随空白自然丢弃
+  let mut pending_space = false
   for t in tokens {
-    if !first {
-      let prev_tail = if prev.length() > 0 {
-        prev[prev.length() - 1]
-      } else {
-        0
+    if t == " " {
+      if prev != "" {
+        pending_space = true
       }
-      let no_space = is_joiner(t) || is_joiner_char(prev_tail)
-      if !no_space {
-        sb.write_string(" ")
-      }
+      continue
+    }
+    // 括号内不留空白：`:not( .b )` → `:not(.b)`
+    if pending_space && prev != "(" && t != ")" {
+      sb.write_string(" ")
     }
     sb.write_string(t)
     prev = t
-    first = false
+    pending_space = false
   }
   sb.to_string()
-}
-
-///|
-/// 是否为会紧贴下一个 token 的选择器连接符字符
-fn is_joiner_char(u : UInt16) -> Bool {
-  u == '.' ||
-  u == ':' ||
-  u == '#' ||
-  u == '>' ||
-  u == '+' ||
-  u == '~' ||
-  u == '-' ||
-  u == '&' ||
-  u == '@' ||
-  u == '%' ||
-  u == '[' ||
-  u == '('
-}
-
-///|
-/// 是否为选择器连接符（前不加空格）
-///
-/// `(` / `)` 也在内：`:has(...)` / `:not(...)` 这类函数式伪类里不能插空格，
-/// 插了浏览器整条丢弃（`@supports (display: grid)` 同理）。
-fn is_joiner(t : String) -> Bool {
-  t == ":" ||
-  t == "." ||
-  t == "#" ||
-  t == "@" ||
-  t == "%" ||
-  t == "&" ||
-  t == ">" ||
-  t == "+" ||
-  t == "~" ||
-  t == "-" ||
-  t == "[" ||
-  t == "]" ||
-  t == "(" ||
-  t == ")" ||
-  t.has_prefix("#{")
 }

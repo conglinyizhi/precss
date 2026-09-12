@@ -347,26 +347,33 @@ fn combine_selector(parent : String, sel : Array[String]) -> String {
 ///|
 /// 选择器 token 拼装。
 ///
-/// 直接 `" "` 拼会把 `.a:hover` 变成 `.a : hover`、`.a, .b` 变成 `.a , .b`。
-/// 规则：`:` 两侧都不留空格，`,` 前不留、后要留；其余（含 `>` `+` `~`
-/// 这类组合器）保留空格。
+/// 空白完全按 token 流原样还原（`@scss.tokenize` 保留空白 token）：有空白
+/// 才有空格，选择器里 `.a.b` 与 `.a .b` 的差别就靠这个。以前是丢掉空白后
+/// 用「`:` 两侧不加空格」之类的启发式猜回来的，猜错就把复合选择器变成
+/// 后代选择器（见 issue #2）。`:` 的紧贴关系现在由无空白自然得到，
+/// 只有括号内、逗号前后额外收紧（向 less.js 看齐）。
 fn join_selector_tokens(sel : Array[String]) -> String {
   let buf = StringBuilder()
-  for i = 0; i < sel.length(); i = i + 1 {
-    if i > 0 {
-      let prev = sel[i - 1]
-      let tok = sel[i]
-      let tight = tok.has_prefix(":") ||
-        tok.has_prefix(",") ||
-        tok == "(" ||
-        tok == ")" ||
-        prev.has_suffix(":") ||
-        prev.has_suffix("(")
-      if !tight {
+  // 上一个已写出的 token（"" 表示还没写任何东西）
+  let mut prev = ""
+  let mut pending_space = false
+  for t in sel {
+    if t == " " {
+      if prev != "" {
+        pending_space = true
+      }
+      continue
+    }
+    // 逗号后一定留一个空格：`,` 后面本来不该紧跟选择器 token（那里的空白
+    // 已在分词阶段省掉），不补这一下 `.a, .b` 会变成 `.a,.b`
+    if pending_space || prev == "," {
+      if prev != "(" && t != ")" && t != "," {
         buf.write_char(' ')
       }
     }
-    buf.write_string(sel[i])
+    buf.write_string(t)
+    prev = t
+    pending_space = false
   }
   buf.to_string()
 }

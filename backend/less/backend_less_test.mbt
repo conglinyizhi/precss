@@ -342,6 +342,56 @@ test "function value keeps tight" {
 }
 
 ///|
+/// 回归（issue #2）：LESS 走另一条 `join_selector_tokens`，同样会在函数式伪类的
+/// 右括号后面插空格：`.a:not(.b).c` → `.a:not(.b) .c`，复合选择器变后代选择器。
+test "K: functional pseudo keeps tight to following simple selector" {
+  inspect(
+    compile_less(
+      ".a:not(.b).c input { position: absolute; }\n.a:not(.b):hover { opacity: 1; }\n.d:has(input:checked).e { color: red; }",
+    ),
+    content=(
+      #|.a:not(.b).c input {
+      #|  position: absolute;
+      #|}
+      #|
+      #|.a:not(.b):hover {
+      #|  opacity: 1;
+      #|}
+      #|
+      #|.d:has(input:checked).e {
+      #|  color: red;
+      #|}
+      #|
+    ),
+  )
+}
+
+///|
+/// 回归（issue #2 的反例）：作者写的后代选择器不能被粘成复合选择器。
+/// 空白进 token 流后，`.x:not(.y) .z` 与 `.x:not(.y).z` 各归各位。
+test "K2: descendant after functional pseudo keeps space" {
+  inspect(
+    compile_less(
+      ".x:not(.y) .z { a: 1; }\n.x:not(.y):hover { a: 2; }\n.x:not(.y)>b { a: 3; }",
+    ),
+    content=(
+      #|.x:not(.y) .z {
+      #|  a: 1;
+      #|}
+      #|
+      #|.x:not(.y):hover {
+      #|  a: 2;
+      #|}
+      #|
+      #|.x:not(.y)>b {
+      #|  a: 3;
+      #|}
+      #|
+    ),
+  )
+}
+
+///|
 /// 回归：LESS 的 `merge_math` 同样不能折 `calc()` 里的算术
 test "calc keeps its own arithmetic" {
   inspect(
