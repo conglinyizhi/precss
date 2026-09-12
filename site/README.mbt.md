@@ -10,9 +10,7 @@
 ```
 site/
 ├── styles/tailwind.scss   # 自研 minimal tailwind-like（@each 生成 utility）
-├── tw/tw.mbt              # ★ 由 gen-types 生成的类型化 wrapper（每个 class 一个 pub fn）
 ├── cmd/ssg/               # SSG：编译 tailwind → out/tailwind.css；rabbit 渲染 out/index.html
-│   └── main.mbt           #   组件里用 @tw.flex() / @tw.mt_4() …
 └── out/                   # 构建产物（gitignore）
 ```
 
@@ -34,13 +32,21 @@ let types = @css.generate_types(read_text("styles/tailwind.scss"))
 write_file("app/tw.mbt", types)
 ```
 
-### 或命令行（site 里这么生成的）
+### 或命令行
 
 ```bash
-cat styles/tailwind.scss | moon run cmd/cli -- gen-types > tw/tw.mbt
+moon run cmd/cli -- gen-types < site/styles/tailwind.scss > site/tw/tw.mbt
 ```
 
-生成结果是**链式 builder**（`site/tw/tw.mbt`，94 个方法 + `TW` struct）：
+> 必须在**仓库根**调用：在 `site/` 里 `moon run cmd/cli` 解析不到该包
+> （工作区成员只看得到自己的包）。
+>
+> 当前站点**没有接入**这套 wrapper：`site/cmd` 里没有 `import .../tw`，组件直接写
+> class 字符串。原先的 `site/tw/` 包是早期接入时代生成的产物，改版后没人 import
+> 却一直留在仓库里，已连同包一起删掉。要重新接入就：生成文件 + 补 `moon.pkg` +
+> 在消费方 `import`，三步都要做。
+
+生成结果是**链式 builder**（94 个方法 + `TW` struct）：
 
 ```moonbit
 pub struct TW { classes : Array[String] }
@@ -87,7 +93,8 @@ pnpm run site:dev
 
 开发命令会将 SSG 产物写入被忽略的 `site/public/`，由 `cmd/server` 通过 Rabbita server 提供；生产仍写入 `site/out/`，两条链路互不覆盖。
 
-> `tw/tw.mbt` 是生成产物；改 `styles/tailwind.scss` 后用 `gen-types` 重新生成即可。
+> `tw/tw.mbt` 是生成产物且**当前无人消费**（见上文说明）；仓库里只保留库函数与
+> CLI 入口，站点不再存一份。
 
 ## 依赖
 
