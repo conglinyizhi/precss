@@ -411,6 +411,41 @@ test "SCSS 静默错误改为显式报错" {
 }
 
 ///|
+/// 关系比较只对数字成立。对照 oracle：
+/// `@if $x < b` → `Undefined operation "a < b".`；字符串 / 布尔同理。
+/// `==` / `!=` 跨类型放行（false / true）。以前非数字一律静默返回 false，
+/// 条件不成立，分支悄悄丢掉。
+test "SCSS 不可比较的类型显式报错" {
+  assert_true(
+    scss_out("$x: a; .a { @if $x < b { color: red; } }").contains(
+      "Undefined operation \"a < b\"",
+    ),
+  )
+  assert_true(
+    scss_out(".a { @if \"a\" < \"b\" { color: red; } }").contains(
+      "Undefined operation",
+    ),
+  )
+  assert_true(
+    scss_out(".a { @if true < false { color: red; } }").contains(
+      "Undefined operation",
+    ),
+  )
+  // == / != 不该被误伤
+  assert_true(
+    scss_out("$x: a; .a { @if $x == b { color: red; } @else { color: blue; } }").contains(
+      "color: blue",
+    ),
+  )
+  assert_true(
+    scss_out("$x: a; .a { @if $x != b { color: red; } }").contains("color: red"),
+  )
+  assert_true(
+    scss_out(".a { @if 1 != \"a\" { color: red; } }").contains("color: red"),
+  )
+}
+
+///|
 /// LESS 侧同理（对照 less.js：variable @x is undefined / Unrecognised input）
 test "LESS 静默错误改为显式报错" {
   assert_true(

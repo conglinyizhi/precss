@@ -1517,7 +1517,11 @@ fn v_neg(a : CondVal, neg : Bool) -> CondVal {
 }
 
 ///|
-fn v_cmp(op : String, a : CondVal, b : CondVal) -> CondVal {
+fn v_cmp(
+  op : String,
+  a : CondVal,
+  b : CondVal,
+) -> CondVal raise @core.CompileError {
   match (a, b) {
     (NumV(x), NumV(y)) => {
       let r = if op == "==" {
@@ -1535,31 +1539,63 @@ fn v_cmp(op : String, a : CondVal, b : CondVal) -> CondVal {
       }
       BoolV(r)
     }
-    (BoolV(x), BoolV(y)) =>
-      BoolV(
-        if op == "==" {
-          x == y
-        } else if op == "!=" {
-          x != y
-        } else {
-          false
-        },
-      )
+    (BoolV(x), BoolV(y)) => cmp_eq_only(op, x == y, a, b)
     // 字符串相等：`@if $density == compact` 走这里。
     // 以前 StrV 落到 `_` 分支恒为 false，两个分支都不进，整条规则静默消失。
-    (StrV(x), StrV(y)) =>
-      BoolV(
-        if op == "==" {
-          x == y
-        } else if op == "!=" {
-          x != y
-        } else {
-          // 字符串没有大小比较（dart-sass 直接报错），不假装能比
-          false
-        },
-      )
-    // 类型不同：只有 != 为真
-    _ => BoolV(op == "!=")
+    (StrV(x), StrV(y)) => cmp_eq_only(op, x == y, a, b)
+    // 类型不同：`==` false / `!=` true，dart-sass 也放行
+    _ =>
+      if op == "==" {
+        BoolV(false)
+      } else if op == "!=" {
+        BoolV(true)
+      } else {
+        raise undefined_op(op, a, b)
+      }
+  }
+}
+
+///|
+/// 只支持 `==` / `!=` 的类型（布尔、字符串）：`<` `>` 这类交给报错
+fn cmp_eq_only(
+  op : String,
+  eq : Bool,
+  a : CondVal,
+  b : CondVal,
+) -> CondVal raise @core.CompileError {
+  if op == "==" {
+    BoolV(eq)
+  } else if op == "!=" {
+    BoolV(!eq)
+  } else {
+    raise undefined_op(op, a, b)
+  }
+}
+
+///|
+/// dart-sass 对不可比较的类型直接报错：`Undefined operation "a < b".`
+///
+/// 以前悄悄返回 false，条件不成立，分支静默丢掉。
+fn undefined_op(op : String, a : CondVal, b : CondVal) -> @core.CompileError {
+  @core.CompileError::EngineFailed(
+    engine="scss",
+    message="Undefined operation \"" +
+      v_show(a) +
+      " " +
+      op +
+      " " +
+      v_show(b) +
+      "\".",
+  )
+}
+
+///|
+/// 条件值的展示形式（用于报错消息）
+fn v_show(v : CondVal) -> String {
+  match v {
+    NumV(n) => n.to_string()
+    BoolV(b) => if b { "true" } else { "false" }
+    StrV(s) => s
   }
 }
 
