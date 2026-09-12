@@ -5,7 +5,7 @@
 //   moon add <module>@<version>
 name = "conglinyizhi/precss"
 
-version = "0.1.2"
+version = "0.1.3"
 
 readme = "README.mbt.md"
 
