@@ -84,8 +84,20 @@ pub fn tokenize(src : String) -> Array[String] {
       continue
     }
     // 数字（含 .5、-2 等）
-    if is_digit(c) || (c == '.' && i + 1 < n && is_digit(src[i + 1])) {
-      let mut j = i
+    //
+    // 负号与数字紧贴、且前面有空隙时，整体并成一个「负值」token：
+    // `0px 3px 1px -2px` 是四个空格分隔的值，不是 `1px - 2px` 减法。
+    // 不合并的话 fold_arith 会把 `1px - 2px` 求值成 `-1px`，静默改掉语义。
+    let neg_num = c == '-' &&
+      i > 0 &&
+      is_ws(src[i - 1]) &&
+      i + 1 < n &&
+      (
+        is_digit(src[i + 1]) ||
+        (src[i + 1] == '.' && i + 2 < n && is_digit(src[i + 2]))
+      )
+    if is_digit(c) || (c == '.' && i + 1 < n && is_digit(src[i + 1])) || neg_num {
+      let mut j = if neg_num { i + 1 } else { i }
       while j < n &&
             (
               is_digit(src[j]) ||
@@ -137,12 +149,18 @@ pub fn tokenize(src : String) -> Array[String] {
       continue
     }
     // 插值 `#{...}` 作为一个整体 token
+    //
+    // 紧贴其后的标识符字符并入同一 token：`#{$name}__overlay` 若不并，
+    // 后面 join 时会在 `}` 与 `__overlay` 之间插一个空格，选择器就废了。
     if c == '#' && i + 1 < n && src[i + 1] == '{' {
       let mut j = i + 2
       while j < n && src[j] != '}' {
         j += 1
       }
       if j < n {
+        j += 1
+      }
+      while j < n && is_ident_char(src[j]) {
         j += 1
       }
       toks.push(src[i:j].to_owned())
@@ -661,11 +679,16 @@ fn is_joiner_char(u : UInt16) -> Bool {
   u == '-' ||
   u == '&' ||
   u == '@' ||
-  u == '%'
+  u == '%' ||
+  u == '[' ||
+  u == '('
 }
 
 ///|
 /// 是否为选择器连接符（前不加空格）
+///
+/// `(` / `)` 也在内：`:has(...)` / `:not(...)` 这类函数式伪类里不能插空格，
+/// 插了浏览器整条丢弃（`@supports (display: grid)` 同理）。
 fn is_joiner(t : String) -> Bool {
   t == ":" ||
   t == "." ||
@@ -679,5 +702,7 @@ fn is_joiner(t : String) -> Bool {
   t == "-" ||
   t == "[" ||
   t == "]" ||
+  t == "(" ||
+  t == ")" ||
   t.has_prefix("#{")
 }

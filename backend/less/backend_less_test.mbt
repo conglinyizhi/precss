@@ -320,3 +320,43 @@ test "media" {
     ),
   )
 }
+
+///|
+/// 回归：函数式括号里不能被插空格（LESS 走独立的 `join_selector_tokens`）。
+/// 以前 `:has(input:checked)` → `:has ( input:checked )`，浏览器整条丢弃。
+test "functional parens keep tight" {
+  inspect(
+    compile_less(
+      ".a:has(input:checked) .b { display: inline-flex; }\n.v-btn:not(.v-btn--disabled):hover > .v-btn__overlay { opacity: .12; }",
+    ),
+    content=(
+      #|.a:has(input:checked) .b {
+      #|  display: inline-flex;
+      #|}
+      #|
+      #|.v-btn:not(.v-btn--disabled):hover > .v-btn__overlay {
+      #|  opacity: .12;
+      #|}
+      #|
+      #|
+    ),
+  )
+}
+
+///|
+/// 回归：值里函数调用与逗号不能再插空格。
+/// 以前 `rgba(0,0,0,.2)` → `rgba ( 0 , 0 , 0 , .2 )`，是无效 CSS。
+test "function value keeps tight" {
+  inspect(
+    compile_less(
+      ".x { box-shadow: 0px 3px 1px -2px var(--o, rgba(0,0,0,.2)), 0px 2px 2px 0px #000; }",
+    ),
+    content=(
+      #|.x {
+      #|  box-shadow: 0px 3px 1px -2px var(--o, rgba(0, 0, 0, .2)), 0px 2px 2px 0px #000;
+      #|}
+      #|
+      #|
+    ),
+  )
+}

@@ -339,7 +339,10 @@ fn join_selector_tokens(sel : Array[String]) -> String {
       let tok = sel[i]
       let tight = tok.has_prefix(":") ||
         tok.has_prefix(",") ||
-        prev.has_suffix(":")
+        tok == "(" ||
+        tok == ")" ||
+        prev.has_suffix(":") ||
+        prev.has_suffix("(")
       if !tight {
         buf.write_char(' ')
       }
@@ -445,6 +448,10 @@ fn resolve_at(t : String, env : Env) -> String raise @core.CompileError {
 
 ///|
 /// 合并 `num op num` 为计算结果（仅数字运算，单位取左侧）
+///
+/// 其余 token 按 CSS 习惯拼接：函数名与 `(`、`,` `:` `)` 之间不插空格，
+/// 否则 `rgba(0, 0, 0, .2)` 会变成 `rgba ( 0 , 0 , 0 , .2 )`——这是无效 CSS，
+/// 浏览器会整条声明丢弃。
 fn merge_math(toks : Array[String]) -> String {
   let sb = StringBuilder()
   let mut i = 0
@@ -455,17 +462,32 @@ fn merge_math(toks : Array[String]) -> String {
       is_operator(toks[i + 1]) &&
       is_number(toks[i + 2]) {
       let r = num_arith(t, toks[i + 1], toks[i + 2])
+      if i > 0 && value_needs_space(toks[i - 1], r) {
+        sb.write_string(" ")
+      }
       sb.write_string(r)
       i += 3
     } else {
+      if i > 0 && value_needs_space(toks[i - 1], t) {
+        sb.write_string(" ")
+      }
       sb.write_string(t)
       i += 1
     }
-    if i < toks.length() {
-      sb.write_string(" ")
-    }
   }
   sb.to_string()
+}
+
+///|
+/// 相邻两个值 token 之间是否需要空格
+fn value_needs_space(prev : String, cur : String) -> Bool {
+  if is_operator(cur) || cur == "(" || cur == ")" || cur == "," || cur == ":" {
+    return false
+  }
+  if prev == "(" || is_operator(prev) {
+    return false
+  }
+  true
 }
 
 ///|

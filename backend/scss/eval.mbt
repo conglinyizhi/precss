@@ -219,7 +219,9 @@ fn gen(
       VarDef(name, value) => apply_vardef(env, name, value)
       MixinDef(name, params, body) => env.mixins[name] = { params, body, }
       Decl(name, value) =>
-        sb.write_string("  \{name}: \{resolve(value, env)};\n")
+        sb.write_string(
+          "  \{interp_token(name, env)}: \{resolve(value, env)};\n",
+        )
       Import(_) => ()
       Raw(s) => {
         sb.write_string(s)
@@ -285,7 +287,8 @@ fn gen_struct(
     Content => ()
     VarDef(name, value) => apply_vardef(env, name, value)
     MixinDef(name, params, body) => env.mixins[name] = { params, body, }
-    Decl(name, value) => sb.write_string("  \{name}: \{resolve(value, env)};\n")
+    Decl(name, value) =>
+      sb.write_string("  \{interp_token(name, env)}: \{resolve(value, env)};\n")
     Import(_) => ()
     Raw(s) => {
       sb.write_string(s)
@@ -320,7 +323,8 @@ fn split_body(
 ) -> Unit raise @core.CompileError {
   for n in body {
     match n {
-      Decl(name, value) => decl_lines.push("\{name}: \{resolve(value, env)};")
+      Decl(name, value) =>
+        decl_lines.push("\{interp_token(name, env)}: \{resolve(value, env)};")
       VarDef(name, value) => apply_vardef(env, name, value)
       MixinDef(name, params, body2) =>
         env.mixins[name] = { params, body: body2, }
@@ -425,18 +429,19 @@ fn expand_each(
   env : Env,
 ) -> Array[Node] raise @core.CompileError {
   let out : Array[Node] = []
-  let list_src = deref_each_list(list, env)
+  let list_src = strip_group_parens(deref_each_list(list, env))
   if vars.length() == 1 {
     let uses_var = nodes_contain_var(body, vars[0])
-    for group in split_on_commas(list_src) {
-      let val = resolve(group, env)
+    for raw_group in split_on_commas(list_src) {
+      let val = resolve(strip_group_parens(raw_group), env)
       let sub = if uses_var { substitute_var(body, vars[0], val) } else { body }
       for s in sub {
         out.push(s)
       }
     }
   } else {
-    for group in split_on_commas(list_src) {
+    for raw_group in split_on_commas(list_src) {
+      let group = strip_group_parens(raw_group)
       let mut b = body
       let mut k = 0
       while k < vars.length() && k < group.length() {
@@ -452,6 +457,34 @@ fn expand_each(
     }
   }
   out
+}
+
+///|
+/// 去掉一组 token 最外层的配对括号：`( a b )` -> `a b`
+///
+/// 必须校验配对：`(1 2), (3 4)` 的首 `(` 与末尾 `)` 不是一对，不能剥。
+fn strip_group_parens(toks : Array[String]) -> Array[String] {
+  let n = toks.length()
+  if n < 2 || toks[0] != "(" || toks[n - 1] != ")" {
+    return toks
+  }
+  let mut depth = 0
+  for i, t in toks {
+    if t == "(" {
+      depth += 1
+    } else if t == ")" {
+      depth -= 1
+      // 首括号提前闭合 → 末尾的 `)` 属于下一个分组
+      if depth == 0 && i != n - 1 {
+        return toks
+      }
+    }
+  }
+  if depth == 0 {
+    toks[1:n - 1].to_owned()
+  } else {
+    toks
+  }
 }
 
 ///| 若 @each 的 list 是单个 `$var` 引用，解引用成其值 token 数组（含逗号），
@@ -472,33 +505,111 @@ fn deref_each_list(list : Array[String], env : Env) -> Array[String] {
 }
 
 ///|
-/// 把 "0 0, 1 0.25rem" 这类字符串拆成 [0, 0, ",", 1, 0.25rem] token
+/// 把 "0 0, 1 0.25rem" 这类 list 字符串拆回 token
+///
+/// 变量存的是 resolve 后的单字符串，@each 要按逗号/空格重新切结构。
+/// 引号内、括号内的分隔符不参与切分：`"24,103,192"` 是**一个**值，
+/// 不能按逗号拆成三段（否则元组解构会错乱）。
 fn spread_list_string(s : String) -> Array[String] {
   let out : Array[String] = []
+  // 先去掉最外层括号，否则顶层逗号会被算成括号内层，分不开组。
+  let body = strip_wrapping_parens(s)
   let mut cur = StringBuilder()
-  for ch in s {
-    if ch == ' ' || ch == '\t' {
+  let mut depth = 0
+  let mut quote : Char = '\u{0}'
+  for ch in body {
+    if quote != '\u{0}' {
+      cur.write_char(ch)
+      if ch == quote {
+        quote = '\u{0}'
+      }
+      continue
+    }
+    if ch == '"' || ch == '\'' {
+      quote = ch
+      cur.write_char(ch)
+      continue
+    }
+    if ch == '(' || ch == '[' {
       let item = cur.to_string()
       if item.length() > 0 {
         out.push(item)
         cur = StringBuilder()
       }
-    } else if ch == ',' {
+      out.push(ch.to_string())
+      depth += 1
+      continue
+    }
+    if ch == ')' || ch == ']' {
+      let item = cur.to_string()
+      if item.length() > 0 {
+        out.push(item)
+        cur = StringBuilder()
+      }
+      out.push(ch.to_string())
+      if depth > 0 {
+        depth -= 1
+      }
+      continue
+    }
+    if ch == ',' && depth == 0 {
       let item = cur.to_string()
       if item.length() > 0 {
         out.push(item)
         cur = StringBuilder()
       }
       out.push(",")
-    } else {
-      cur.write_char(ch)
+      continue
     }
+    if ch == ' ' || ch == '\t' {
+      let item = cur.to_string()
+      if item.length() > 0 {
+        out.push(item)
+        cur = StringBuilder()
+      }
+      continue
+    }
+    cur.write_char(ch)
   }
   let item = cur.to_string()
   if item.length() > 0 {
     out.push(item)
   }
   out
+}
+
+///|
+/// 去掉最外层成对括号：`(a b, c d)` -> `a b, c d`
+///
+/// 只有首个 `(` 与末尾 `)` 正好配对时才去：`(1 2), (3 4)` 是并列的两个
+/// 括号组，不能被当成一个整体剥掉外层。
+fn strip_wrapping_parens(s : String) -> String {
+  let t = s.trim().to_owned()
+  if t.length() < 2 || t[0] != '(' || t[t.length() - 1] != ')' {
+    return t
+  }
+  let mut depth = 0
+  let mut quote : UInt16 = 0
+  let mut i = 0
+  while i < t.length() {
+    let ch = t[i]
+    if quote != 0 {
+      if ch == quote {
+        quote = 0
+      }
+    } else if ch == '"' || ch == '\'' {
+      quote = ch
+    } else if ch == '(' {
+      depth += 1
+    } else if ch == ')' {
+      depth -= 1
+      if depth == 0 && i != t.length() - 1 {
+        return t
+      }
+    }
+    i += 1
+  }
+  t[1:t.length() - 1].trim().to_owned()
 }
 
 ///| 按逗号拆分 token 数组
@@ -546,48 +657,47 @@ fn join_resolved(
 ///|
 /// 对选择器字符串里的 `#{$var}` 插值求值
 fn resolve_sel_interp(s : String, env : Env) -> String raise @core.CompileError {
-  if !s.contains("#{") {
-    return s
+  interp_token(s, env)
+}
+
+///|
+/// 对单个 token / 字符串里的 `#{...}` 插值求值
+///
+/// 一个 token 里可能有多段插值（`#{$a}-#{$b}`），逐段替换。
+/// 插值结果若是带引号的字符串会去掉引号——这是 SCSS 的 `#{}` 语义，
+/// 也是 `@include mixin("v-btn")` 里 `.#{$name}` 出来带引号的根因。
+fn interp_token(t : String, env : Env) -> String raise @core.CompileError {
+  if !t.contains("#{") {
+    return t
   }
-  let mut out = s
-  let mut changed = true
-  while changed {
-    changed = false
-    let n = out.length()
-    let mut start = -1
-    let mut i = 0
-    while i + 1 < n {
-      if out[i] == '#' && out[i + 1] == '{' {
-        start = i
+  let sb = StringBuilder()
+  let n = t.length()
+  let mut i = 0
+  while i < n {
+    if i + 1 < n && t[i] == '#' && t[i + 1] == '{' {
+      let mut j = i + 2
+      while j < n && t[j] != '}' {
+        j += 1
+      }
+      if j >= n {
+        // 未闭合：原样保留剩余文本，交给上层报错
+        sb.write_string(t[i:n].to_owned())
         break
       }
+      let inner = t[i + 2:j].trim().to_owned()
+      let val = if inner.length() == 0 {
+        ""
+      } else {
+        resolve(tokenize_str(inner), env)
+      }
+      sb.write_string(tri_quotes(val))
+      i = j + 1
+    } else {
+      sb.write_char(Int::unsafe_to_char(t[i].to_int()))
       i += 1
     }
-    if start < 0 {
-      break
-    }
-    let mut j = start + 2
-    while j < n && out[j] != '}' {
-      j += 1
-    }
-    if j >= n {
-      break
-    }
-    let inner = out[start + 2:j].to_owned()
-    if inner.length() > 0 && inner[0] == '$' {
-      match Env::get_var(env, inner) {
-        Some(v) => {
-          let val = resolve(v, env)
-          out = out.replace(old="#{" + inner + "}", new=val)
-          changed = true
-        }
-        None => break
-      }
-    } else {
-      break
-    }
   }
-  out
+  sb.to_string()
 }
 
 ///|
@@ -652,7 +762,9 @@ fn nodes_contain_var(nodes : Array[Node], v : String) -> Bool {
 ///|
 fn node_contains_var(n : Node, v : String) -> Bool {
   match n {
-    Decl(_, value) => toks_contain_var(value, v)
+    // 属性名也要查：`--v-theme-#{$name}` 的插值只在名字里
+    Decl(name, value) =>
+      toks_contain_var([name], v) || toks_contain_var(value, v)
     RuleSet(sel, body) => toks_contain_var(sel, v) || nodes_contain_var(body, v)
     If(cond, tb, eb) =>
       toks_contain_var(cond, v) ||
@@ -698,7 +810,10 @@ fn substitute_var(nodes : Array[Node], v : String, val : String) -> Array[Node] 
 ///|
 fn subst_node(n : Node, v : String, val : String) -> Node {
   match n {
-    Decl(name, value) => Decl(name, subst_toks(value, v, val))
+    // 名字里也有插值时（`--v-#{$name}`）一并替换，否则名字上的 $name
+    // 会在后面插值求值时暴露成「Undefined variable」
+    Decl(name, value) =>
+      Decl(subst_toks([name], v, val)[0], subst_toks(value, v, val))
     RuleSet(sel, body) =>
       RuleSet(subst_toks(sel, v, val), substitute_var(body, v, val))
     If(cond, tb, eb) =>
@@ -734,12 +849,18 @@ fn subst_node(n : Node, v : String, val : String) -> Node {
 fn subst_toks(toks : Array[String], v : String, val : String) -> Array[String] {
   let out : Array[String] = []
   let interp = "#{" + v + "}"
+  // 插值里引号字符串要去引号（`#{"v-btn"}` -> `v-btn`）；
+  // 裸 `$v` 用在值位置时保留引号。
+  let interp_val = tri_quotes(val)
   for t in toks {
-    if t == v || t == interp {
+    if t == v {
       out.push(val)
-    } else if t.contains(interp) || t.contains(v) {
-      let s = t.replace(old=interp, new=val)
-      out.push(s.replace(old=v, new=val))
+    } else if t == interp {
+      out.push(interp_val)
+    } else if t.contains(interp) {
+      out.push(t.replace(old=interp, new=interp_val))
+    } else if t.contains(v) {
+      out.push(t.replace(old=v, new=val))
     } else {
       out.push(t)
     }
@@ -818,20 +939,9 @@ fn resolve(toks : Array[String], env : Env) -> String raise @core.CompileError {
             message="Undefined variable: " + t,
           )
       }
-    } else if t.length() > 2 && t.has_prefix("#{") && t.has_suffix("}") {
-      let inner = t[2:t.length() - 1].to_owned()
-      if inner.length() > 0 && inner[0] == '$' {
-        match Env::get_var(env, inner) {
-          Some(v) => parts.push(resolve(v, env))
-          None =>
-            raise @core.CompileError::EngineFailed(
-              engine="scss",
-              message="Undefined variable: " + inner,
-            )
-        }
-      } else {
-        parts.push(t)
-      }
+    } else if t.contains("#{") {
+      // 整段 `#{$v}` 或者嵌在标识符里的 `--x-#{$v}` 都走这里
+      parts.push(interp_token(t, env))
     } else {
       parts.push(t)
     }
@@ -890,10 +1000,9 @@ fn is_ident_ish(s : String) -> Bool {
 }
 
 ///|
-/// 值 token 序列化：运算符及其相邻 token 紧密拼接
+/// 值 token 序列化：运算符 / 括号 / 逗号 / 冒号按 CSS 习惯紧贴相邻 token
 fn join_value_tokens(parts : Array[String]) -> String raise @core.CompileError {
   let sb = StringBuilder()
-  let mut prev_is_op = false
   for i, t in parts {
     if t == "+" {
       // 字符串连接：去除 +，且让前后 token 紧密（c + d -> cd）。
@@ -905,21 +1014,31 @@ fn join_value_tokens(parts : Array[String]) -> String raise @core.CompileError {
           message="Expected expression.",
         )
       }
-      prev_is_op = true
       continue
     }
-    let joined = is_op(t) || is_paren(t)
-    if i == 0 {
-      prev_is_op = joined
-    } else {
-      if !joined && !prev_is_op {
-        sb.write_string(" ")
-      }
-      prev_is_op = joined
+    if i > 0 && value_needs_space(parts[i - 1], t) {
+      sb.write_string(" ")
     }
     sb.write_string(t)
   }
   sb.to_string()
+}
+
+///|
+/// 相邻两个值 token 之间是否需要空格
+///
+/// `,` `:` `)` 与运算符、左括号都紧贴前一个 token；
+/// 左括号、运算符之后的 token 也紧贴——`var(--o, rgba(0, 0, 0, .2))`
+/// 以前会被插成 `var(--o , rgba(0 , 0 , 0 , 0.2))`，`:has()` / `@supports`
+/// 的 `:` 同理。
+fn value_needs_space(prev : String, cur : String) -> Bool {
+  if is_op(cur) || is_paren(cur) || cur == "," || cur == ":" {
+    return false
+  }
+  if prev == "(" || is_op(prev) {
+    return false
+  }
+  true
 }
 
 ///|
@@ -1325,7 +1444,21 @@ fn v_cmp(op : String, a : CondVal, b : CondVal) -> CondVal {
           false
         },
       )
-    _ => BoolV(false)
+    // 字符串相等：`@if $density == compact` 走这里。
+    // 以前 StrV 落到 `_` 分支恒为 false，两个分支都不进，整条规则静默消失。
+    (StrV(x), StrV(y)) =>
+      BoolV(
+        if op == "==" {
+          x == y
+        } else if op == "!=" {
+          x != y
+        } else {
+          // 字符串没有大小比较（dart-sass 直接报错），不假装能比
+          false
+        },
+      )
+    // 类型不同：只有 != 为真
+    _ => BoolV(op == "!=")
   }
 }
 
